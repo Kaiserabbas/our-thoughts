@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { getFontFamilyCss } from './fontUtils';
 import { generateSpiritualVoiceWav, triggerDownload } from './audioExporter';
 import {
