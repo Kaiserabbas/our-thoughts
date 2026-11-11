@@ -2431,3 +2431,5 @@ export default function App() {
 // SPA Navigation helper and hashchange sync
 
 // Capacitor Android hardware back button handler
+
+// Academic reading page layout
