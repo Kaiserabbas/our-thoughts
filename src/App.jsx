@@ -1,3 +1,21 @@
+function parseHashRoute(hash) {
+  const clean = (hash || '').replace(/^#\/?/, '').trim();
+  if (!clean) return { view: 'home', thoughtId: null, isEdit: false };
+  if (clean === 'similar') return { view: 'similar', thoughtId: null, isEdit: false };
+  if (clean === 'add') return { view: 'add', thoughtId: null, isEdit: false };
+  if (clean === 'settings') return { view: 'settings', thoughtId: null, isEdit: false };
+
+  const match = clean.match(/^thought\/([^/]+)(\/edit)?$/);
+  if (match) {
+    return {
+      view: 'thought',
+      thoughtId: decodeURIComponent(match[1]),
+      isEdit: Boolean(match[2]),
+    };
+  }
+
+  return { view: 'home', thoughtId: null, isEdit: false };
+}
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
