@@ -5472,3 +5472,9 @@ h1 {
   --border-color: #30363d;
   --accent-gold: #d4a34b;
 }
+
+/* Jameel Noori Nastaleeq typography optimization */
+:root {
+  line-height: 2.1;
+  font-family: "Jameel Noori Nastaleeq", "Noto Nastaliq Urdu", serif;
+}
