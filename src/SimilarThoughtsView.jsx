@@ -15,6 +15,7 @@ import {
   Sparkles,
   Star,
   Tag,
+  User,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -268,9 +269,17 @@ export default function SimilarThoughtsView({
                 onClick={() => setSelectedThought(thought)}
               >
                 <div className="card-top-row">
-                  <span className="article-meta">
-                    <CalendarDays size={13} /> {formatDate(thought.entryDate || thought.createdAt)}
-                  </span>
+                  <div className="card-top-left-badges">
+                    <span className="article-meta">
+                      <CalendarDays size={13} /> {formatDate(thought.entryDate || thought.createdAt)}
+                    </span>
+                    {thought.author && (
+                      <span className="card-author-badge" title="مصنف / قلم کار">
+                        <User size={11} />
+                        <span>{thought.author}</span>
+                      </span>
+                    )}
+                  </div>
                   <div className="card-quick-actions">
                     <button
                       type="button"

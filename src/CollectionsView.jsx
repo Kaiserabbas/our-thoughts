@@ -17,6 +17,7 @@ import {
   Star,
   Tag,
   Trash2,
+  User,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -134,10 +135,18 @@ export default function CollectionsView({
         }}
       >
         <div className="card-top-row">
-          <span className="card-category-badge">
-            <Tag size={12} />
-            <span>{thought.category || 'متفرق'}</span>
-          </span>
+          <div className="card-top-left-badges">
+            <span className="card-category-badge">
+              <Tag size={12} />
+              <span>{thought.category || 'متفرق'}</span>
+            </span>
+            {thought.author && (
+              <span className="card-author-badge" title="مصنف / قلم کار">
+                <User size={11} />
+                <span>{thought.author}</span>
+              </span>
+            )}
+          </div>
           <div className="card-quick-actions">
             {/* Quick Listen in Spiritual Voice (Gemini TTS) */}
             <button
