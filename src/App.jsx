@@ -4,6 +4,7 @@ import { Browser } from '@capacitor/browser';
 import { App as CapApp } from '@capacitor/app';
 import { GoogleDriveService } from './googleDrive';
 import CollectionsView from './CollectionsView';
+import SimilarThoughtsView from './SimilarThoughtsView';
 import SettingsView from './SettingsView';
 import ConfirmModal from './ConfirmModal';
 import GeminiKeyModal from './GeminiKeyModal';
