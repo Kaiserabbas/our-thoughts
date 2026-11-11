@@ -53,6 +53,7 @@ import {
   Quote,
   RotateCw,
   Save,
+  Search,
   Settings,
   Share2,
   Sparkles,
@@ -187,21 +188,40 @@ function copyToClipboard(text) {
   return Promise.resolve();
 }
 
-function parseInlineMarkdown(text) {
+function highlightSearchWords(node, query) {
+  if (!query || !query.trim() || typeof node !== 'string') return node;
+  const rawWords = query.trim().split(/\s+/).filter(Boolean);
+  if (rawWords.length === 0) return node;
+  const escaped = rawWords.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = node.split(regex);
+  if (parts.length <= 1) return node;
+  return parts.map((part, index) =>
+    regex.test(part) ? (
+      <mark key={index} className="search-word-highlight">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function parseInlineMarkdown(text, highlightQuery) {
   if (!text) return null;
   const tokens = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
   return tokens.map((token, i) => {
     if (token.startsWith('**') && token.endsWith('**') && token.length >= 4) {
-      return <strong key={i}>{token.slice(2, -2)}</strong>;
+      return <strong key={i}>{highlightSearchWords(token.slice(2, -2), highlightQuery)}</strong>;
     }
     if (token.startsWith('*') && token.endsWith('*') && token.length >= 2) {
-      return <em key={i}>{token.slice(1, -1)}</em>;
+      return <em key={i}>{highlightSearchWords(token.slice(1, -1), highlightQuery)}</em>;
     }
-    return token;
+    return highlightSearchWords(token, highlightQuery);
   });
 }
 
-function renderFormattedContent(text) {
+function renderFormattedContent(text, highlightQuery) {
   if (!text) return 'No description added yet.';
   const lines = text.split('\n');
 
@@ -219,7 +239,7 @@ function renderFormattedContent(text) {
         className={`content-line ${isQuote ? 'line-quote' : ''} ${isBullet ? 'line-bullet' : ''}`}
       >
         {isBullet && <span className="bullet-dot">• </span>}
-        {parseInlineMarkdown(cleanLine)}
+        {parseInlineMarkdown(cleanLine, highlightQuery)}
         {idx < lines.length - 1 && <br />}
       </span>
     );
@@ -426,6 +446,8 @@ export default function App() {
   const { translate } = useTranslate();
 
   const [copiedLink, setCopiedLink] = useState(false);
+  const [inReadingSearchOpen, setInReadingSearchOpen] = useState(false);
+  const [inReadingSearchQuery, setInReadingSearchQuery] = useState('');
   const [readingFontSize, setReadingFontSize] = useState(() => {
     return parseInt(localStorage.getItem('reading_font_size') || '22', 10);
   });
@@ -461,6 +483,8 @@ export default function App() {
     setShowTranslated(false);
     setTranslatedThought(null);
     setActiveSpeakingThoughtId(null);
+    setInReadingSearchOpen(false);
+    setInReadingSearchQuery('');
     if (window.location.hash.startsWith('#/thought/')) {
       if (window.history.length > 1) {
         window.history.back();
@@ -1573,6 +1597,19 @@ export default function App() {
 
                     <button
                       type="button"
+                      className={`icon-button reading-search-btn ${inReadingSearchOpen ? 'active' : ''}`}
+                      onClick={() => {
+                        setInReadingSearchOpen(!inReadingSearchOpen);
+                        if (inReadingSearchOpen) setInReadingSearchQuery('');
+                      }}
+                      aria-label="Search in thought"
+                      title={inReadingSearchOpen ? 'تلاش بند کریں' : 'اس فکر میں تلاش کریں (Search in thought)'}
+                    >
+                      <Search size={17} />
+                    </button>
+
+                    <button
+                      type="button"
                       className="icon-button"
                       onClick={handleStartEditThought}
                       aria-label="Edit thought"
@@ -2034,6 +2071,31 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* In-Reading Word Search Bar */}
+                {inReadingSearchOpen && (
+                  <div className="reading-search-bar" role="search" aria-label="In-thought word search">
+                    <Search size={16} />
+                    <input
+                      type="text"
+                      placeholder="اس فکر کے متن میں کوئی بھی لفظ تلاش کریں..."
+                      value={inReadingSearchQuery}
+                      onChange={(e) => setInReadingSearchQuery(e.target.value)}
+                      autoFocus
+                      dir="auto"
+                    />
+                    {inReadingSearchQuery && (
+                      <button
+                        type="button"
+                        className="search-clear-btn"
+                        onClick={() => setInReadingSearchQuery('')}
+                        title="صاف کریں"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Academic Article Title */}
                 <h1
                   className="reading-article-title"
@@ -2042,7 +2104,7 @@ export default function App() {
                     fontFamily: getFontFamilyCss(selectedThought.fontFamily) || "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif",
                   }}
                 >
-                  {selectedThought.subject || 'بلا عنوان فکر'}
+                  {highlightSearchWords(selectedThought.subject || 'بلا عنوان فکر', inReadingSearchQuery)}
                 </h1>
 
                 {/* Dedicated Google Gemini SoundPlayer */}
@@ -2077,7 +2139,7 @@ export default function App() {
                     fontFamily: getFontFamilyCss(selectedThought.fontFamily) || "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif",
                   }}
                 >
-                  {renderFormattedContent(selectedThought.description)}
+                  {renderFormattedContent(selectedThought.description, inReadingSearchQuery)}
                 </div>
 
                 <div className="academic-ornament footer-ornament" aria-hidden="true">

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { getFontFamilyCss } from './fontUtils';
 import { generateSpiritualVoiceWav, triggerDownload } from './audioExporter';
 import {
@@ -20,7 +20,61 @@ import {
   User,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
+
+// Arabic / Urdu diacritic and character normalization
+function normalizeUrduText(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, '')
+    .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
+    .replace(/[\u0649\u064A\u06D0\u06D2]/g, '\u06CC')
+    .replace(/[\u0629\u06C1\u06C2]/g, '\u06C1')
+    .toLowerCase();
+}
+
+function highlightMatches(text, query) {
+  if (!text || typeof text !== 'string' || !query || !query.trim()) return text;
+  const rawWords = query.trim().split(/\s+/).filter(Boolean);
+  if (rawWords.length === 0) return text;
+  const escaped = rawWords.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = text.split(regex);
+  if (parts.length <= 1) return text;
+  return parts.map((part, index) =>
+    regex.test(part) ? (
+      <mark key={index} className="search-word-highlight">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function getSearchExcerpt(text, query, max = 160) {
+  if (!text) return 'No description added yet.';
+  const trimmed = text.trim();
+  if (!query || !query.trim()) {
+    return trimmed.length > max ? `${trimmed.slice(0, max)}...` : trimmed;
+  }
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const lower = trimmed.toLowerCase();
+  let firstIdx = -1;
+  for (const w of words) {
+    const idx = lower.indexOf(w);
+    if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) {
+      firstIdx = idx;
+    }
+  }
+  if (firstIdx === -1 || firstIdx < max / 2) {
+    return trimmed.length > max ? `${trimmed.slice(0, max)}...` : trimmed;
+  }
+  const start = Math.max(0, firstIdx - 40);
+  const end = Math.min(trimmed.length, start + max);
+  return `${start > 0 ? '... ' : ''}${trimmed.slice(start, end)}${end < trimmed.length ? ' ...' : ''}`;
+}
 
 export default function CollectionsView({
   categories,
@@ -46,6 +100,29 @@ export default function CollectionsView({
   const [copiedId,    setCopiedId]    = useState(null);
   const [exportingId, setExportingId] = useState(null);
   const categoryTabsRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  // Global hotkey: Ctrl+K or / to focus search input instantly
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      } else if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        if (collectionSearchQuery) {
+          setCollectionSearchQuery('');
+        } else {
+          searchInputRef.current?.blur();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [collectionSearchQuery, setCollectionSearchQuery]);
 
   const scrollCategoryTabs = (direction) => {
     if (categoryTabsRef.current) {
@@ -53,7 +130,11 @@ export default function CollectionsView({
       categoryTabsRef.current.scrollBy({ left: scrollOffset, behavior: 'smooth' });
     }
   };
-  const normalizedQuery = collectionSearchQuery.trim().toLowerCase();
+
+  const trimmedQuery = collectionSearchQuery.trim();
+  const normalizedWords = normalizeUrduText(trimmedQuery)
+    .split(/\s+/)
+    .filter(Boolean);
 
   const handleQuickCopy = (e, thought) => {
     e.stopPropagation();
@@ -82,12 +163,16 @@ export default function CollectionsView({
     setExportingId(null);
   };
 
-  // Apply search + favorites filter (category is handled by tabs)
+  // Robust multi-word search with diacritic-tolerant matching across subject, body, category, and author
   const baseFiltered = [...thoughts]
     .sort((left, right) => Number(right.createdAt || right.timestamp || 0) - Number(left.createdAt || left.timestamp || 0))
     .filter((thought) => {
-      const haystack = `${thought.subject} ${thought.description} ${thought.category}`.toLowerCase();
-      const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery);
+      const haystack = normalizeUrduText(
+        `${thought.subject || ''} ${thought.description || ''} ${thought.category || ''} ${thought.author || ''}`
+      );
+      const matchesQuery =
+        normalizedWords.length === 0 ||
+        normalizedWords.every((word) => haystack.includes(word));
       const matchesFavorite = !collectionFavoritesOnly || thought.favorite;
       return matchesQuery && matchesFavorite;
     });
@@ -143,7 +228,7 @@ export default function CollectionsView({
             {thought.author && (
               <span className="card-author-badge" title="مصنف / قلم کار">
                 <User size={11} />
-                <span>{thought.author}</span>
+                <span>{highlightMatches(thought.author, trimmedQuery)}</span>
               </span>
             )}
           </div>
@@ -220,7 +305,7 @@ export default function CollectionsView({
           className="article-title"
           style={{ fontFamily: getFontFamilyCss(thought.fontFamily) }}
         >
-          {thought.subject || 'Untitled thought'}
+          {highlightMatches(thought.subject || 'Untitled thought', trimmedQuery)}
         </strong>
 
         <p
@@ -234,7 +319,10 @@ export default function CollectionsView({
             fontFamily: getFontFamilyCss(thought.fontFamily),
           }}
         >
-          {summarizeText(thought.description, 160)}
+          {highlightMatches(
+            getSearchExcerpt(thought.description, trimmedQuery, 160),
+            trimmedQuery
+          )}
         </p>
 
         <div className="card-bottom-row">
@@ -356,17 +444,62 @@ export default function CollectionsView({
         </button>
       </div>
 
-      {/* ── Search Bar ── */}
+      {/* ── Search Bar & Convenient Word Discovery ── */}
       <div className="collections-toolbar">
-        <label className="search-box">
-          <Search size={16} />
-          <input
-            value={collectionSearchQuery}
-            onChange={(event) => setCollectionSearchQuery(event.target.value)}
-            placeholder="Search thoughts..."
-            dir="auto"
-          />
-        </label>
+        <div className="search-box-row">
+          <label className="search-box">
+            <Search size={16} className="search-box-icon" />
+            <input
+              ref={searchInputRef}
+              value={collectionSearchQuery}
+              onChange={(event) => setCollectionSearchQuery(event.target.value)}
+              placeholder="تلاش کریں... لفظ، عنوان، مصنف، یا مفہوم (Search thoughts, words, authors...)"
+              dir="auto"
+            />
+            {collectionSearchQuery && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => {
+                  setCollectionSearchQuery('');
+                  if (searchInputRef.current) searchInputRef.current.focus();
+                }}
+                title="تلاش صاف کریں (Clear search)"
+                aria-label="Clear search"
+              >
+                <X size={15} />
+              </button>
+            )}
+            <kbd className="search-kbd-hint" title="Press Ctrl+K or / to search">Ctrl K</kbd>
+          </label>
+        </div>
+
+        {/* Quick Word Discovery Chips */}
+        <div className="search-quick-tags" role="region" aria-label="Quick search terms">
+          <span className="search-tags-label">
+            <Sparkles size={12} />
+            <span>تجویز کردہ الفاظ:</span>
+          </span>
+          <div className="search-tag-pills">
+            {['کوفہ', 'شریعتی', 'نہج البلاغہ', 'دعا', 'عشق', 'علم', 'فاطمہؑ', 'حکمت'].map((kw) => (
+              <button
+                key={kw}
+                type="button"
+                className={`search-tag-chip ${collectionSearchQuery.includes(kw) ? 'active' : ''}`}
+                onClick={() => {
+                  if (collectionSearchQuery === kw) {
+                    setCollectionSearchQuery('');
+                  } else {
+                    setCollectionSearchQuery(kw);
+                    if (searchInputRef.current) searchInputRef.current.focus();
+                  }
+                }}
+              >
+                {kw}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* ── Content ── */}
@@ -380,9 +513,77 @@ export default function CollectionsView({
         </div>
       ) : visibleThoughts.length === 0 ? (
         <div className="empty-state">
-          <Search size={20} />
-          <p>No thoughts match this view.</p>
+          <Search size={26} />
+          <p className="empty-title">
+            {trimmedQuery ? (
+              <>
+                <strong>"{trimmedQuery}"</strong> کے لیے کوئی فکر نہیں ملا۔
+              </>
+            ) : (
+              'اس زمرے میں کوئی فکر دستیاب نہیں ہے۔'
+            )}
+          </p>
+          <p className="empty-desc">
+            مختلف الفاظ یا املا کے ساتھ دوبارہ تلاش کریں، یا تمام کیٹیگریز دیکھیں۔
+          </p>
+          <div className="empty-actions">
+            {collectionSelectedCategory !== 'All' && trimmedQuery && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setCollectionSelectedCategory('All')}
+              >
+                تمام موضوعات میں تلاش کریں
+              </button>
+            )}
+            {trimmedQuery && (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  setCollectionSearchQuery('');
+                  if (searchInputRef.current) searchInputRef.current.focus();
+                }}
+              >
+                <X size={14} />
+                <span>تلاش صاف کریں</span>
+              </button>
+            )}
+          </div>
         </div>
+      ) : trimmedQuery ? (
+        /* ── Active Search Results: show ALL matching thoughts without 2-item truncation ── */
+        <section className="single-category-view search-results-view">
+          <div className="section-title-row search-results-title-row">
+            <div className="search-results-heading">
+              <Search size={18} />
+              <h2>
+                <span>تلاش کے نتائج:</span>
+                <span className="search-query-badge">"{trimmedQuery}"</span>
+              </h2>
+            </div>
+            <div className="search-results-actions">
+              <span className="search-count-badge">
+                {visibleThoughts.length} {visibleThoughts.length === 1 ? 'فکر ملا' : 'افکار ملے'}
+              </span>
+              <button
+                type="button"
+                className="search-clear-inline-btn"
+                onClick={() => {
+                  setCollectionSearchQuery('');
+                  if (searchInputRef.current) searchInputRef.current.focus();
+                }}
+                title="تلاش بند کریں"
+              >
+                <X size={14} />
+                <span>صاف کریں</span>
+              </button>
+            </div>
+          </div>
+          <div className="article-list">
+            {visibleThoughts.map((thought) => renderThoughtCard(thought))}
+          </div>
+        </section>
       ) : collectionSelectedCategory !== 'All' || collectionFavoritesOnly ? (
         /* ── Single category or favorites: flat grid, ALL thoughts ── */
         <section className="single-category-view">
