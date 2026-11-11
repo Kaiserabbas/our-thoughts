@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Check,
   ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
   Heart,
@@ -133,8 +134,9 @@ export default function CollectionsView({
         }}
       >
         <div className="card-top-row">
-          <span className="article-meta">
-            <Tag size={12} /> <span>{thought.category || "متفرق"}</span>
+          <span className="card-category-badge">
+            <Tag size={12} />
+            <span>{thought.category || 'متفرق'}</span>
           </span>
           <div className="card-quick-actions">
             {/* Quick Listen in Spiritual Voice (Gemini TTS) */}
@@ -227,26 +229,35 @@ export default function CollectionsView({
         </p>
 
         <div className="card-bottom-row">
-          <span className="article-category-badge">
-            <Tag size={11} /> {thought.category}
-          </span>
+          <div className="card-bottom-left">
+            <span className="article-meta">
+              <CalendarDays size={12} /> {formatDate(thought.entryDate || thought.createdAt || thought.timestamp)}
+            </span>
+            {thought.description && (
+              <span className="article-word-count">
+                {thought.description.trim().split(/\s+/).length} الفاظ
+              </span>
+            )}
+          </div>
 
-          {/* Export Audio button — under every post */}
-          <button
-            type="button"
-            className={`card-export-audio-btn ${exportingId === thought.id ? 'exporting' : ''}`}
-            onClick={(e) => handleExportAudio(e, thought)}
-            disabled={exportingId === thought.id}
-            title="Export spiritual voice audio (.wav)"
-            aria-label="Export audio"
-          >
-            <Download size={12} />
-            <span>{exportingId === thought.id ? 'Exporting...' : 'Export Audio'}</span>
-          </button>
+          <div className="card-bottom-right">
+            {/* Export Audio button (Icon button) */}
+            <button
+              type="button"
+              className={`card-export-audio-btn icon-only ${exportingId === thought.id ? 'exporting' : ''}`}
+              onClick={(e) => handleExportAudio(e, thought)}
+              disabled={exportingId === thought.id}
+              title={exportingId === thought.id ? 'آڈیو تیار ہو رہی ہے...' : 'آڈیو محفوظ کریں (.wav)'}
+              aria-label="Export audio"
+            >
+              <Download size={13} />
+            </button>
 
-          <span className="article-open">
-            Open full view <ChevronLeft size={14} />
-          </span>
+            <span className="article-open-pill" title="مطالعہ فکر (Read thought)">
+              <span>مطالعہ</span>
+              <ChevronLeft size={13} />
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -272,45 +283,67 @@ export default function CollectionsView({
         </div>
       </div>
 
-      {/* ── Category Tabs ── */}
-      <div className="category-tabs" role="tablist" aria-label="Filter by category">
+      {/* ── Category Tabs with Scroll Controls ── */}
+      <div className="category-scroll-container">
         <button
           type="button"
-          role="tab"
-          aria-selected={collectionSelectedCategory === 'All' && !collectionFavoritesOnly}
-          className={`category-tab ${collectionSelectedCategory === 'All' && !collectionFavoritesOnly ? 'active' : ''}`}
-          onClick={() => { setCollectionSelectedCategory('All'); setCollectionFavoritesOnly(false); }}
+          className="category-scroll-arrow left"
+          onClick={() => scrollCategoryTabs('left')}
+          title="پچھلے موضوعات (Scroll Left)"
+          aria-label="Scroll categories left"
         >
-          <BookOpen size={15} />
-          All
-          <span className="tab-count">{baseFiltered.length}</span>
+          <ChevronLeft size={18} />
         </button>
 
-        {categories.map((category) => (
+        <div className="category-tabs" ref={categoryTabsRef} role="tablist" aria-label="Filter by category">
           <button
-            key={category}
             type="button"
             role="tab"
-            aria-selected={collectionSelectedCategory === category && !collectionFavoritesOnly}
-            className={`category-tab ${collectionSelectedCategory === category && !collectionFavoritesOnly ? 'active' : ''}`}
-            onClick={() => { setCollectionSelectedCategory(category); setCollectionFavoritesOnly(false); }}
+            aria-selected={collectionSelectedCategory === 'All' && !collectionFavoritesOnly}
+            className={`category-tab ${collectionSelectedCategory === 'All' && !collectionFavoritesOnly ? 'active' : ''}`}
+            onClick={() => { setCollectionSelectedCategory('All'); setCollectionFavoritesOnly(false); }}
           >
-            <Tag size={14} />
-            {category}
-            <span className="tab-count">{categoryCounts[category] || 0}</span>
+            <BookOpen size={14} />
+            تمام افکار
+            <span className="tab-count">{baseFiltered.length}</span>
           </button>
-        ))}
+
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              role="tab"
+              aria-selected={collectionSelectedCategory === category && !collectionFavoritesOnly}
+              className={`category-tab ${collectionSelectedCategory === category && !collectionFavoritesOnly ? 'active' : ''}`}
+              onClick={() => { setCollectionSelectedCategory(category); setCollectionFavoritesOnly(false); }}
+            >
+              <Tag size={13} />
+              {category}
+              <span className="tab-count">{categoryCounts[category] || 0}</span>
+            </button>
+          ))}
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={collectionFavoritesOnly}
+            className={`category-tab tab-favorites ${collectionFavoritesOnly ? 'active' : ''}`}
+            onClick={() => { setCollectionFavoritesOnly(true); setCollectionSelectedCategory('All'); }}
+          >
+            <Star size={13} />
+            پسندیدہ
+            <span className="tab-count">{favoritesCount}</span>
+          </button>
+        </div>
 
         <button
           type="button"
-          role="tab"
-          aria-selected={collectionFavoritesOnly}
-          className={`category-tab tab-favorites ${collectionFavoritesOnly ? 'active' : ''}`}
-          onClick={() => { setCollectionFavoritesOnly(true); setCollectionSelectedCategory('All'); }}
+          className="category-scroll-arrow right"
+          onClick={() => scrollCategoryTabs('right')}
+          title="اگلے موضوعات (Scroll Right)"
+          aria-label="Scroll categories right"
         >
-          <Star size={14} />
-          Favorites
-          <span className="tab-count">{favoritesCount}</span>
+          <ChevronRight size={18} />
         </button>
       </div>
 
