@@ -371,8 +371,18 @@ export default function App() {
   const [pasteToast, setPasteToast] = useState(null);
 
   // ── Password Protection State (@ThoughtsOrganizer@) ──
+  const [rememberPassword, setRememberPassword] = useState(() => {
+    try {
+      return localStorage.getItem('thought_organizer_remember_password') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [isUnlocked, setIsUnlocked] = useState(() => {
     try {
+      if (localStorage.getItem('thought_organizer_remember_password') === 'true') {
+        return true;
+      }
       return sessionStorage.getItem('thought_organizer_unlocked') === 'true';
     } catch {
       return false;
@@ -497,14 +507,23 @@ export default function App() {
       setIsUnlocked(true);
       try {
         sessionStorage.setItem('thought_organizer_unlocked', 'true');
+        if (rememberPassword) {
+          localStorage.setItem('thought_organizer_remember_password', 'true');
+        } else {
+          localStorage.removeItem('thought_organizer_remember_password');
+        }
       } catch {}
       setPasswordModalOpen(false);
       setPasswordError('');
       const target = pendingTargetView || 'add';
       setPendingTargetView(null);
       handleSwitchView(target);
-      setPasteToast('رسائی منظور! خوش آمدید (Access granted)');
-      setTimeout(() => setPasteToast(null), 2000);
+      setPasteToast(
+        rememberPassword
+          ? 'رسائی منظور! پاس ورڈ محفوظ کر لیا گیا (Password saved)'
+          : 'رسائی منظور! خوش آمدید (Access granted)'
+      );
+      setTimeout(() => setPasteToast(null), 2200);
     } else {
       setPasswordError('غلط پاس ورڈ! دوبارہ کوشش کریں (Incorrect password)');
     }
@@ -519,11 +538,13 @@ export default function App() {
 
   const handleLockSession = () => {
     setIsUnlocked(false);
+    setRememberPassword(false);
     try {
       sessionStorage.removeItem('thought_organizer_unlocked');
+      localStorage.removeItem('thought_organizer_remember_password');
     } catch {}
     handleSwitchView('home');
-    setPasteToast('سیشن لاک کر دیا گیا (Session locked)');
+    setPasteToast('سیشن اور محفوظ پاس ورڈ لاک کر دیا گیا (Session locked)');
     setTimeout(() => setPasteToast(null), 2000);
   };
 
@@ -2799,6 +2820,15 @@ export default function App() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+
+              <label className="password-remember-label">
+                <input
+                  type="checkbox"
+                  checked={rememberPassword}
+                  onChange={(e) => setRememberPassword(e.target.checked)}
+                />
+                <span>پاس ورڈ محفوظ رکھیں (Save password on this device)</span>
+              </label>
 
               {passwordError && (
                 <div className="password-error-alert" role="alert">
