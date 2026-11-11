@@ -43,6 +43,14 @@ export default function CollectionsView({
 }) {
   const [copiedId,    setCopiedId]    = useState(null);
   const [exportingId, setExportingId] = useState(null);
+  const categoryTabsRef = useRef(null);
+
+  const scrollCategoryTabs = (direction) => {
+    if (categoryTabsRef.current) {
+      const scrollOffset = direction === 'left' ? -280 : 280;
+      categoryTabsRef.current.scrollBy({ left: scrollOffset, behavior: 'smooth' });
+    }
+  };
   const normalizedQuery = collectionSearchQuery.trim().toLowerCase();
 
   const handleQuickCopy = (e, thought) => {
