@@ -12,6 +12,7 @@ import VoicePanel from './VoicePanel';
 import { useTTS } from './useTTS';
 import { containsUrdu, formatEnglishSentence } from './useVoice';
 import { useTranslate } from './useTranslate';
+import initialData from './initialData.json';
 import './App.css';
 import {
   AlignCenter,
