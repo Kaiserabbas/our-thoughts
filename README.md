@@ -49,6 +49,14 @@
 - Intuitive horizontal category chips bar equipped with dedicated **Left (`ChevronLeft`) and Right (`ChevronRight`) scroll buttons**.
 - Smooth 280px step navigation allowing readers to effortlessly browse all collections without awkward trackpad gestures.
 
+### 🔐 Access Control & Security
+- **Protected Administrative Zones**: The Composer (`#/add`) and Settings (`#/settings`) are protected by passphrase security (`@ThoughtsOrganizer@`).
+- **Session-Based Verification**: Authenticates within the active session so you don't have to re-enter the password on every immediate action.
+
+### ✍️ Author & Contributor Attribution
+- **Contributor Field**: Record who added each reflection or excerpt during entry.
+- **Card Badges**: Contributor identity is neatly displayed on thought cards alongside publication dates and word counts.
+
 ### 🎙️ Audio Narrator & Spiritual Voice Export
 - **Gemini AI Audio Player**: Embedded `PostSoundPlayer` with visual track scrubber and time elapsed display.
 - **WAV Audio Export**: Download spiritual voice audio files (`.wav`) per thought with a single click.
