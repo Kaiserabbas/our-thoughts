@@ -134,7 +134,7 @@ export default function CollectionsView({
       >
         <div className="card-top-row">
           <span className="article-meta">
-            <CalendarDays size={13} /> {formatDate(thought.entryDate || thought.createdAt || thought.timestamp)}
+            <Tag size={12} /> <span>{thought.category || "متفرق"}</span>
           </span>
           <div className="card-quick-actions">
             {/* Quick Listen in Spiritual Voice (Gemini TTS) */}
