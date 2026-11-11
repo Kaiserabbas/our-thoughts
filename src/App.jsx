@@ -2433,3 +2433,5 @@ export default function App() {
 // Capacitor Android hardware back button handler
 
 // Academic reading page layout
+
+// Circular back icon button and share link
