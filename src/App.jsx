@@ -34,6 +34,8 @@ import {
   CloudLightning,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   FilePlus2,
   Heart,
   Italic,
@@ -41,6 +43,7 @@ import {
   Layers,
   List,
   Loader2,
+  Lock,
   LogOut,
   Moon,
   Palette,
@@ -58,6 +61,7 @@ import {
   Tag,
   Trash2,
   Type,
+  User,
   Volume2,
   VolumeX,
   WifiOff,
@@ -101,9 +105,14 @@ const TEXT_COLORS = [
 ];
 
 function makeBlankForm(categories) {
+  let defaultAuthor = '';
+  try {
+    defaultAuthor = localStorage.getItem('thought_organizer_default_author') || '';
+  } catch {}
   return {
     subject: '',
     description: '',
+    author: defaultAuthor,
     category: categories[0] || DEFAULT_CATEGORIES[0],
     entryDate: new Date().toISOString().slice(0, 10),
     favorite: false,
@@ -120,6 +129,7 @@ function makeEditForm(thought, categories) {
   return {
     subject: thought?.subject || '',
     description: thought?.description || '',
+    author: thought?.author || '',
     category: thought?.category || categories[0] || DEFAULT_CATEGORIES[0],
     entryDate: String(thought?.entryDate || new Date().toISOString().slice(0, 10)).slice(0, 10),
     favorite: Boolean(thought?.favorite),
@@ -360,6 +370,20 @@ export default function App() {
   const [copiedThought, setCopiedThought] = useState(false);
   const [pasteToast, setPasteToast] = useState(null);
 
+  // ── Password Protection State (@ThoughtsOrganizer@) ──
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    try {
+      return sessionStorage.getItem('thought_organizer_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [pendingTargetView, setPendingTargetView] = useState(null);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   // ── Voice & Audio state ──
   const [voiceLang, setVoiceLang] = useState(() => {
     return localStorage.getItem('thought_organizer_voice_lang') || 'ur-PK';
@@ -456,6 +480,53 @@ export default function App() {
     else navigateTo(view);
   }, [navigateTo]);
 
+  const requestProtectedView = useCallback((targetView) => {
+    if (isUnlocked) {
+      handleSwitchView(targetView);
+    } else {
+      setPendingTargetView(targetView);
+      setPasswordInput('');
+      setPasswordError('');
+      setPasswordModalOpen(true);
+    }
+  }, [isUnlocked, handleSwitchView]);
+
+  const handlePasswordSubmit = (e) => {
+    if (e) e.preventDefault();
+    if (passwordInput.trim() === '@ThoughtsOrganizer@') {
+      setIsUnlocked(true);
+      try {
+        sessionStorage.setItem('thought_organizer_unlocked', 'true');
+      } catch {}
+      setPasswordModalOpen(false);
+      setPasswordError('');
+      const target = pendingTargetView || 'add';
+      setPendingTargetView(null);
+      handleSwitchView(target);
+      setPasteToast('رسائی منظور! خوش آمدید (Access granted)');
+      setTimeout(() => setPasteToast(null), 2000);
+    } else {
+      setPasswordError('غلط پاس ورڈ! دوبارہ کوشش کریں (Incorrect password)');
+    }
+  };
+
+  const handleCancelPassword = () => {
+    setPasswordModalOpen(false);
+    setPasswordInput('');
+    setPasswordError('');
+    setPendingTargetView(null);
+  };
+
+  const handleLockSession = () => {
+    setIsUnlocked(false);
+    try {
+      sessionStorage.removeItem('thought_organizer_unlocked');
+    } catch {}
+    handleSwitchView('home');
+    setPasteToast('سیشن لاک کر دیا گیا (Session locked)');
+    setTimeout(() => setPasteToast(null), 2000);
+  };
+
   const handleCopyLink = useCallback(() => {
     if (!selectedThought) return;
     const url = `${window.location.origin}${window.location.pathname}#/thought/${selectedThought.id}`;
@@ -487,7 +558,15 @@ export default function App() {
       } else {
         setSelectedThought(null);
         setIsEditingThought(false);
-        setActiveView(route.view || 'home');
+        if ((route.view === 'add' || route.view === 'settings') && !isUnlocked) {
+          setPendingTargetView(route.view);
+          setPasswordInput('');
+          setPasswordError('');
+          setPasswordModalOpen(true);
+          setActiveView('home');
+        } else {
+          setActiveView(route.view || 'home');
+        }
       }
       if (typeof window !== 'undefined') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -497,7 +576,7 @@ export default function App() {
     syncFromHash();
     window.addEventListener('hashchange', syncFromHash);
     return () => window.removeEventListener('hashchange', syncFromHash);
-  }, [thoughts]);
+  }, [thoughts, isUnlocked]);
 
   // Capacitor Android hardware back button integration
   useEffect(() => {
@@ -1075,10 +1154,18 @@ export default function App() {
     const description = formData.description.trim();
     if (!subject && !description) return;
 
+    const author = formData.author ? formData.author.trim() : '';
+    if (author) {
+      try {
+        localStorage.setItem('thought_organizer_default_author', author);
+      } catch {}
+    }
+
     const nextThought = {
       id: crypto.randomUUID(),
       subject: subject || 'Untitled thought',
       description,
+      author,
       category: formData.category || categories[0] || DEFAULT_CATEGORIES[0],
       entryDate: formData.entryDate || new Date().toISOString().slice(0, 10),
       favorite: Boolean(formData.favorite),
@@ -1210,10 +1297,18 @@ export default function App() {
     const description = editFormData.description.trim();
     if (!subject && !description) return;
 
+    const author = editFormData.author ? editFormData.author.trim() : '';
+    if (author) {
+      try {
+        localStorage.setItem('thought_organizer_default_author', author);
+      } catch {}
+    }
+
     const updatedThought = {
       ...selectedThought,
       subject: subject || 'Untitled thought',
       description,
+      author,
       category: editFormData.category || categories[0] || DEFAULT_CATEGORIES[0],
       entryDate: editFormData.entryDate || new Date().toISOString().slice(0, 10),
       favorite: Boolean(editFormData.favorite),
@@ -1347,6 +1442,19 @@ export default function App() {
             <Download size={17} />
           </button>
 
+          {/* Quick Session Lock Button (Visible when unlocked) */}
+          {isUnlocked && (
+            <button
+              type="button"
+              className="action-button icon-only-btn session-lock-btn"
+              onClick={handleLockSession}
+              title="سیشن لاک کریں (Lock Session)"
+              aria-label="Lock Session"
+            >
+              <Lock size={16} />
+            </button>
+          )}
+
           {/* Quick Theme Toggle Button (Icon Button) */}
           <button
             type="button"
@@ -1362,7 +1470,7 @@ export default function App() {
           <button
             type="button"
             className={`action-button icon-only-btn settings-icon-btn ${activeView === 'settings' ? 'active' : ''}`}
-            onClick={() => handleSwitchView(activeView === 'settings' ? 'home' : 'settings')}
+            onClick={() => requestProtectedView(activeView === 'settings' ? 'home' : 'settings')}
             title="ترتیبات (Settings)"
             aria-label="Settings"
           >
@@ -1527,6 +1635,20 @@ export default function App() {
                   }
                 }}
               >
+                <div className="field">
+                  <div className="field-label-row">
+                    <span className="flex-label">
+                      <User size={14} /> مصنف / قلم کار (Author / Contributor)
+                    </span>
+                  </div>
+                  <input
+                    value={editFormData.author || ''}
+                    onChange={(event) => setEditFormData((current) => ({ ...current, author: event.target.value }))}
+                    placeholder="آپ کا نام یا قلم کار کا نام (e.g. Kaiser Abbas)"
+                    dir="auto"
+                  />
+                </div>
+
                 <div className="field">
                   <div className="field-label-row">
                     <span>Subject</span>
@@ -1851,6 +1973,12 @@ export default function App() {
                       <Tag size={13} />
                       {selectedThought.category || 'متفرق افکار'}
                     </span>
+                    {selectedThought.author && (
+                      <span className="reading-author-pill" title="قلم کار">
+                        <User size={13} />
+                        <span>قلم: {selectedThought.author}</span>
+                      </span>
+                    )}
                     <span className="reading-date-pill">
                       <CalendarDays size={13} />
                       {formatDate(selectedThought.entryDate || selectedThought.createdAt || selectedThought.timestamp)}
@@ -1945,6 +2073,11 @@ export default function App() {
                     <span className="footer-tag-item">
                       <strong>موضوع:</strong> {selectedThought.category || 'متفرق'}
                     </span>
+                    {selectedThought.author && (
+                      <span className="footer-tag-item">
+                        <strong>قلم کار:</strong> {selectedThought.author}
+                      </span>
+                    )}
                     {selectedThought.fontFamily && (
                       <span className="footer-tag-item">
                         <strong>رسم الخط:</strong> {FONT_OPTIONS.find((f) => f.id === selectedThought.fontFamily)?.label || selectedThought.fontFamily}
@@ -1998,7 +2131,7 @@ export default function App() {
             setSelectedThought={handleSelectThought}
             toggleFavorite={toggleFavorite}
             onRequestDeleteThought={requestDeleteThought}
-            onAddThought={() => setActiveView('add')}
+            onAddThought={() => requestProtectedView('add')}
             onCopyThought={handleCopyThought}
             onListenThought={handleQuickListenThought}
             activeSpeakingThoughtId={activeSpeakingThoughtId}
@@ -2218,6 +2351,20 @@ export default function App() {
                       }));
                     }}
                   />
+
+                  <div className="field">
+                    <div className="field-label-row">
+                      <span className="flex-label">
+                        <User size={14} /> مصنف / قلم کار (Author / Contributor)
+                      </span>
+                    </div>
+                    <input
+                      value={formData.author || ''}
+                      onChange={(event) => setFormData((current) => ({ ...current, author: event.target.value }))}
+                      placeholder="آپ کا نام یا قلم کار کا نام (e.g. Kaiser Abbas)"
+                      dir="auto"
+                    />
+                  </div>
 
                   <div className="field">
                     <div className="field-label-row">
@@ -2615,6 +2762,71 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Security Password Modal (@ThoughtsOrganizer@) ── */}
+      {passwordModalOpen && (
+        <div className="preview-backdrop password-modal-backdrop" role="dialog" aria-modal="true" onClick={handleCancelPassword}>
+          <div className="password-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="password-modal-header">
+              <div className="password-icon-badge">
+                <Lock size={26} />
+              </div>
+              <h3>محفوظ رسائی (Protected Access)</h3>
+              <p>
+                {pendingTargetView === 'settings' ? 'ترتیبات (Settings)' : 'نیا فکر شامل کرنے (Add Thought)'} کے لیے پاس ورڈ درج کریں:
+              </p>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="password-form">
+              <div className="password-input-group">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="password-field-input"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setPasswordError('');
+                  }}
+                  placeholder="پاس ورڈ درج کریں..."
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label="Toggle password visibility"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {passwordError && (
+                <div className="password-error-alert" role="alert">
+                  {passwordError}
+                </div>
+              )}
+
+              <div className="password-modal-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handleCancelPassword}
+                >
+                  منسوخ (Cancel)
+                </button>
+                <button
+                  type="submit"
+                  className="primary-button"
+                >
+                  <Lock size={15} />
+                  <span>تصدیق کریں (Unlock)</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Global Confirm Deletion Modal ── */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
@@ -2640,7 +2852,7 @@ export default function App() {
       <button
         type="button"
         className={`desktop-fab ${activeView === 'add' ? 'active' : ''}`}
-        onClick={() => handleSwitchView(activeView === 'add' ? 'home' : 'add')}
+        onClick={() => requestProtectedView(activeView === 'add' ? 'home' : 'add')}
         aria-label="Add new thought"
         title="Add new thought"
       >
@@ -2672,7 +2884,7 @@ export default function App() {
         <button
           type="button"
           className={`mobile-nav-fab ${activeView === 'add' ? 'active' : ''}`}
-          onClick={() => handleSwitchView('add')}
+          onClick={() => requestProtectedView('add')}
           aria-label="New Thought"
           title="نیا فکر تحریر کریں"
         >
@@ -2682,7 +2894,7 @@ export default function App() {
         <button
           type="button"
           className={`mobile-nav-item ${activeView === 'settings' ? 'active' : ''}`}
-          onClick={() => handleSwitchView('settings')}
+          onClick={() => requestProtectedView('settings')}
           aria-label="Settings"
         >
           <Settings size={19} />
