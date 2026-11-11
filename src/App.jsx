@@ -2427,3 +2427,5 @@ export default function App() {
     </div>
   );
 }
+
+// SPA Navigation helper and hashchange sync
