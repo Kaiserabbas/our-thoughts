@@ -5463,3 +5463,12 @@ h1 {
   }
 }
 
+
+/* Oxford Midnight dark mode color system with gold accents */
+[data-theme="dark"] {
+  --bg-app: #0e1217;
+  --bg-surface: #151b22;
+  --bg-card: #151b22;
+  --border-color: #30363d;
+  --accent-gold: #d4a34b;
+}
