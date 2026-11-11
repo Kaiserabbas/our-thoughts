@@ -1,21 +1,3 @@
-function parseHashRoute(hash) {
-  const clean = (hash || '').replace(/^#\/?/, '').trim();
-  if (!clean) return { view: 'home', thoughtId: null, isEdit: false };
-  if (clean === 'similar') return { view: 'similar', thoughtId: null, isEdit: false };
-  if (clean === 'add') return { view: 'add', thoughtId: null, isEdit: false };
-  if (clean === 'settings') return { view: 'settings', thoughtId: null, isEdit: false };
-
-  const match = clean.match(/^thought\/([^/]+)(\/edit)?$/);
-  if (match) {
-    return {
-      view: 'thought',
-      thoughtId: decodeURIComponent(match[1]),
-      isEdit: Boolean(match[2]),
-    };
-  }
-
-  return { view: 'home', thoughtId: null, isEdit: false };
-}
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
@@ -38,11 +20,17 @@ import {
   AlignJustify,
   AlignLeft,
   AlignRight,
+  ArrowLeft,
+  ArrowRight,
   Bold,
   BookOpen,
+  CalendarDays,
   Check,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   ClipboardPaste,
+  Clock,
   CloudLightning,
   Copy,
   Download,
@@ -50,6 +38,7 @@ import {
   Heart,
   Italic,
   Languages,
+  Layers,
   List,
   Loader2,
   LogOut,
@@ -62,6 +51,7 @@ import {
   RotateCw,
   Save,
   Settings,
+  Share2,
   Sparkles,
   Star,
   Sun,
@@ -76,7 +66,9 @@ import {
 import { getFontFamilyCss, getCategoriesByUsage, FONT_OPTIONS } from './fontUtils';
 
 const CLIENT_ID = '574535920766-ntjn0mr37h07sd3l1n5c3o2j4na7bqok.apps.googleusercontent.com';
-const DEFAULT_CATEGORIES = ['Political', 'Religious', 'Poetry', 'Economics'];
+const DEFAULT_CATEGORIES = Array.isArray(initialData?.categories) && initialData.categories.length
+  ? initialData.categories
+  : ['Political', 'Religious', 'Poetry', 'Economics'];
 
 const CARD_COLORS = [
   { id: 'default', label: 'Default', bg: '#ffffff' },
@@ -263,6 +255,25 @@ function mergeCategories(local, remote) {
   return combined.length ? combined : DEFAULT_CATEGORIES;
 }
 
+function parseHashRoute(hash) {
+  const clean = (hash || '').replace(/^#\/?/, '').trim();
+  if (!clean) return { view: 'home', thoughtId: null, isEdit: false };
+  if (clean === 'similar') return { view: 'similar', thoughtId: null, isEdit: false };
+  if (clean === 'add') return { view: 'add', thoughtId: null, isEdit: false };
+  if (clean === 'settings') return { view: 'settings', thoughtId: null, isEdit: false };
+
+  const match = clean.match(/^thought\/([^/]+)(\/edit)?$/);
+  if (match) {
+    return {
+      view: 'thought',
+      thoughtId: decodeURIComponent(match[1]),
+      isEdit: Boolean(match[2]),
+    };
+  }
+
+  return { view: 'home', thoughtId: null, isEdit: false };
+}
+
 export default function App() {
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'light';
@@ -281,24 +292,34 @@ export default function App() {
   });
 
   const [thoughts, setThoughts] = useState(() => {
-    if (typeof window === 'undefined') return [];
+    const defaultList = Array.isArray(initialData?.thoughts) ? initialData.thoughts : [];
+    if (typeof window === 'undefined') return defaultList;
     try {
       const saved = localStorage.getItem('cached_thoughts');
-      const parsed = JSON.parse(saved || '[]');
-      return Array.isArray(parsed) ? parsed : [];
+      const parsed = JSON.parse(saved || 'null');
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return mergeThoughts(parsed, defaultList);
+      }
+      return defaultList;
     } catch {
-      return [];
+      return defaultList;
     }
   });
 
   const [categories, setCategories] = useState(() => {
-    if (typeof window === 'undefined') return DEFAULT_CATEGORIES;
+    const defaultCats = Array.isArray(initialData?.categories) && initialData.categories.length
+      ? initialData.categories
+      : DEFAULT_CATEGORIES;
+    if (typeof window === 'undefined') return defaultCats;
     try {
       const saved = localStorage.getItem('cached_categories');
       const parsed = JSON.parse(saved || 'null');
-      return normalizeCategories(parsed);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return mergeCategories(parsed, defaultCats);
+      }
+      return defaultCats;
     } catch {
-      return DEFAULT_CATEGORIES;
+      return defaultCats;
     }
   });
 
@@ -370,15 +391,130 @@ export default function App() {
   const { speak, stop: ttsStop, isSpeaking, isLoadingAudio, exportAudio } = useTTS();
   const { translate } = useTranslate();
 
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [readingFontSize, setReadingFontSize] = useState(() => {
+    return parseInt(localStorage.getItem('reading_font_size') || '22', 10);
+  });
+
+  const handleAdjustFontSize = (delta) => {
+    setReadingFontSize((prev) => {
+      const next = Math.min(36, Math.max(16, prev + delta));
+      localStorage.setItem('reading_font_size', String(next));
+      return next;
+    });
+  };
+
+  const navigateTo = useCallback((routePath, replace = false) => {
+    const targetHash = routePath.startsWith('#')
+      ? routePath
+      : `#/${routePath.replace(/^\//, '')}`;
+    if (window.location.hash === targetHash) return;
+    if (replace) {
+      const url = new URL(window.location.href);
+      url.hash = targetHash;
+      window.location.replace(url.href);
+    } else {
+      window.location.hash = targetHash;
+    }
+  }, []);
+
+  const handleSelectThought = useCallback((thought) => {
+    navigateTo(`thought/${thought.id}`);
+  }, [navigateTo]);
+
   const closeSelectedThought = useCallback(() => {
-    setSelectedThought(null);
-    setIsEditingThought(false);
-    setCopiedThought(false);
     ttsStop();
     setShowTranslated(false);
     setTranslatedThought(null);
     setActiveSpeakingThoughtId(null);
-  }, [ttsStop]);
+    if (window.location.hash.startsWith('#/thought/')) {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        navigateTo('');
+      }
+    } else {
+      navigateTo('');
+    }
+  }, [ttsStop, navigateTo]);
+
+  const handleStartEditThought = useCallback(() => {
+    if (selectedThought) {
+      navigateTo(`thought/${selectedThought.id}/edit`);
+    }
+  }, [selectedThought, navigateTo]);
+
+  const handleCancelEditThought = useCallback(() => {
+    if (selectedThought) {
+      setEditFormData(makeEditForm(selectedThought, categories));
+      navigateTo(`thought/${selectedThought.id}`);
+    }
+  }, [selectedThought, categories, navigateTo]);
+
+  const handleSwitchView = useCallback((view) => {
+    if (view === 'home') navigateTo('');
+    else navigateTo(view);
+  }, [navigateTo]);
+
+  const handleCopyLink = useCallback(() => {
+    if (!selectedThought) return;
+    const url = `${window.location.origin}${window.location.pathname}#/thought/${selectedThought.id}`;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setPasteToast('لنک کاپی ہو گیا! (Direct link copied)');
+      setTimeout(() => {
+        setPasteToast(null);
+        setCopiedLink(false);
+      }, 2000);
+    }
+  }, [selectedThought]);
+
+  // Route synchronization on hashchange, mount, and thoughts change
+  useEffect(() => {
+    const syncFromHash = () => {
+      const route = parseHashRoute(window.location.hash);
+      if (route.view === 'thought' && route.thoughtId) {
+        const found = thoughts.find((t) => String(t.id) === String(route.thoughtId));
+        if (found) {
+          setSelectedThought(found);
+          setIsEditingThought(route.isEdit);
+        } else {
+          setSelectedThought(null);
+          setIsEditingThought(false);
+          setActiveView('home');
+        }
+      } else {
+        setSelectedThought(null);
+        setIsEditingThought(false);
+        setActiveView(route.view || 'home');
+      }
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, [thoughts]);
+
+  // Capacitor Android hardware back button integration
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const subPromise = CapApp.addListener('backButton', () => {
+        const clean = window.location.hash.replace(/^#\/?/, '').trim();
+        if (clean && clean !== '/') {
+          window.history.back();
+        } else {
+          CapApp.exitApp();
+        }
+      });
+      return () => {
+        subPromise.then((sub) => sub.remove());
+      };
+    }
+  }, []);
 
   const showPasteToast = (msg) => {
     setPasteToast(msg);
@@ -1056,6 +1192,7 @@ export default function App() {
     if (selectedThought?.id === id) {
       setSelectedThought(null);
       setIsEditingThought(false);
+      navigateTo('', true);
     }
     setStatus('Thought removed');
 
@@ -1094,6 +1231,7 @@ export default function App() {
     setSelectedThought(updatedThought);
     setIsEditingThought(false);
     setStatus('Saved Locally');
+    navigateTo(`thought/${updatedThought.id}`, true);
 
     if (token) {
       await syncWithDrive(updatedThoughts, categories, { directPush: true });
@@ -1185,51 +1323,51 @@ export default function App() {
             <img src="/logo.png" alt="Brain icon" width={120} height={120} />
           </div>
           <div>
-            <p className="eyebrow">Google Drive backed notebook</p>
+            <p className="eyebrow">مجموعۂ افکار و علمی ذخیرہ • Scholarly Compendium</p>
             <h1>Thought Organizer</h1>
           </div>
         </div>
 
         <div className="header-actions">
-          {/* Quick Refresh Memory Button */}
+          {/* Total Thoughts Count Pill */}
+          <span className="status-pill academic-status-pill" title="کل محفوظ شدہ افکار">
+            <BookOpen size={14} className="status-icon success" />
+            <span className="pill-bold">{thoughts.length}</span>
+            <span>افکار</span>
+          </span>
+
+          {/* Quick Backup Export (Icon Button) */}
           <button
             type="button"
-            className="action-button refresh-top-button"
-            onClick={handleRefreshMemory}
-            disabled={isSyncing}
-            title="Refresh memory from Google Drive"
+            className="action-button icon-only-btn backup-top-btn"
+            onClick={handleExportBackup}
+            title="بیک اپ محفوظ کریں (Export JSON Backup)"
+            aria-label="Export Backup"
           >
-            <RotateCw size={15} className={isSyncing ? 'spin' : ''} />
-            <span className="btn-text">Refresh</span>
+            <Download size={17} />
           </button>
 
-          {/* Quick Theme Toggle Button */}
+          {/* Quick Theme Toggle Button (Icon Button) */}
           <button
             type="button"
-            className="action-button theme-quick-toggle"
+            className="action-button icon-only-btn theme-quick-toggle"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             aria-label="Toggle theme"
           >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
 
-          <span className="status-pill">
-            {isSyncing && <CloudLightning className="status-icon pulse" />}
-            {status.includes('Saved') && <CheckCircle className="status-icon success" />}
-            {status.includes('Offline') && <WifiOff className="status-icon" />}
-            {status}
-          </span>
-
-          {token ? (
-            <button type="button" className="action-link" onClick={handleLogout} title="Sign out of Google Drive">
-              <LogOut size={16} /> <span className="btn-text">Sign out</span>
-            </button>
-          ) : (
-            <button type="button" className="primary-button" onClick={handleLogin}>
-              Connect Drive
-            </button>
-          )}
+          {/* Settings (Icon Button) */}
+          <button
+            type="button"
+            className={`action-button icon-only-btn settings-icon-btn ${activeView === 'settings' ? 'active' : ''}`}
+            onClick={() => handleSwitchView(activeView === 'settings' ? 'home' : 'settings')}
+            title="ترتیبات (Settings)"
+            aria-label="Settings"
+          >
+            <Settings size={17} />
+          </button>
         </div>
       </header>
 
@@ -1238,28 +1376,613 @@ export default function App() {
         <button
           type="button"
           className={`tab-pill ${activeView === 'home' ? 'active' : ''}`}
-          onClick={() => setActiveView('home')}
+          onClick={() => handleSwitchView('home')}
         >
-          <BookOpen size={16} /> Home
+          <BookOpen size={16} /> تمام افکار (Home)
         </button>
         <button
           type="button"
-          className={`tab-pill ${activeView === 'add' ? 'active' : ''}`}
-          onClick={() => setActiveView('add')}
+          className={`tab-pill ${activeView === 'similar' ? 'active' : ''}`}
+          onClick={() => handleSwitchView('similar')}
         >
-          <FilePlus2 size={16} /> Add Thought
-        </button>
-        <button
-          type="button"
-          className={`tab-pill ${activeView === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveView('settings')}
-        >
-          <Settings size={16} /> Settings
+          <Layers size={16} /> مماثل افکار (Similar Thoughts)
         </button>
       </div>
 
       {/* ── Main View Container ── */}
       <main className="dashboard">
+        {selectedThought ? (
+          <article
+            className={`academic-reading-page ${selectedThought.cardColor && !selectedThought.cardColor.startsWith('#') ? `card-color-${selectedThought.cardColor}` : ''}`}
+            style={selectedThought.cardColor?.startsWith('#') ? { backgroundColor: selectedThought.cardColor } : undefined}
+          >
+            {/* Top Navigation & Action Controls */}
+            <header className="reading-page-nav">
+              <button
+                type="button"
+                className="icon-button reading-back-btn"
+                onClick={closeSelectedThought}
+                title="واپسی تمام افکار (Back to thoughts)"
+                aria-label="Back to all thoughts"
+              >
+                <ArrowRight size={20} />
+              </button>
+
+              <div className="reading-nav-actions">
+                {!isEditingThought && (
+                  <>
+                    <button
+                      type="button"
+                      className={`icon-button copy-link-btn ${copiedLink ? 'copied' : ''}`}
+                      onClick={handleCopyLink}
+                      aria-label="Copy direct link"
+                      title={copiedLink ? 'لنک کاپی ہو گیا!' : 'کاپی لنک (Share / Direct Link)'}
+                    >
+                      {copiedLink ? <Check size={17} /> : <Share2 size={17} />}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`icon-button copy-post-btn ${copiedThought ? 'copied' : ''}`}
+                      onClick={() => handleCopyThought(selectedThought)}
+                      aria-label="Copy thought"
+                      title={copiedThought ? 'متن کاپی ہو گیا!' : 'کاپی متن (Copy thought)'}
+                    >
+                      {copiedThought ? <Check size={17} /> : <Copy size={17} />}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`icon-button translate-btn ${showTranslated ? 'active' : ''}`}
+                      onClick={handleToggleTranslateSelected}
+                      disabled={isTranslatingThought}
+                      aria-label="Translate thought"
+                      title={isTranslatingThought ? 'Translating...' : showTranslated ? 'Hide translation' : 'Translate thought'}
+                    >
+                      <Languages size={17} />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={handleStartEditThought}
+                      aria-label="Edit thought"
+                      title="ترمیم کریں (Edit thought)"
+                    >
+                      <Pencil size={17} />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleFavorite(selectedThought.id);
+                      }}
+                      aria-label="Toggle favorite"
+                      title={selectedThought.favorite ? 'Remove favorite' : 'Mark favorite'}
+                    >
+                      <Star size={17} className={selectedThought.favorite ? 'filled' : ''} />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        requestDeleteThought(selectedThought);
+                      }}
+                      aria-label="Delete thought"
+                      title="Delete thought"
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="icon-button reading-close-x"
+                  onClick={closeSelectedThought}
+                  aria-label="بند کریں"
+                  title="Close reading view"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </header>
+
+            {/* Translation View Block */}
+            {showTranslated && !isEditingThought && translatedThought && translatedThought.id === selectedThought.id && (
+              <div className="preview-translation-block reading-translation-block" dir="auto">
+                <div className="translation-block-header">
+                  <span className="badge-translated">
+                    <Languages size={14} /> ترجمہ ({translatedThought.targetLang === 'ur' ? 'اردو Urdu' : 'English'})
+                  </span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => setShowTranslated(false)}
+                    title="Close translation"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {translatedThought.subject && (
+                  <h4 className="translation-title">{translatedThought.subject}</h4>
+                )}
+                <div className="translation-body">
+                  {renderFormattedContent(translatedThought.description)}
+                </div>
+              </div>
+            )}
+
+            {isEditingThought ? (
+              <form
+                className="preview-edit-form"
+                onSubmit={handleUpdateThought}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    handleUpdateThought();
+                  }
+                }}
+              >
+                <div className="field">
+                  <div className="field-label-row">
+                    <span>Subject</span>
+                    <button
+                      type="button"
+                      className="paste-quick-btn"
+                      onClick={() => handlePasteToSubject(true)}
+                      title="Paste from clipboard into subject"
+                    >
+                      <ClipboardPaste size={12} />
+                      <span>Paste</span>
+                    </button>
+                  </div>
+                  <input
+                    value={editFormData.subject}
+                    onChange={(event) => setEditFormData((current) => ({ ...current, subject: event.target.value }))}
+                    placeholder="Thought subject"
+                    dir="auto"
+                    style={{
+                      fontFamily: getFontFamilyCss(editFormData.fontFamily),
+                    }}
+                  />
+                </div>
+
+                <div className="field">
+                  <div className="field-label-row">
+                    <span>Description</span>
+                    <button
+                      type="button"
+                      className="paste-quick-btn"
+                      onClick={() => handlePasteToDescription(true)}
+                      title="Paste from clipboard into description"
+                    >
+                      <ClipboardPaste size={12} />
+                      <span>Paste</span>
+                    </button>
+                  </div>
+
+                  <div className="rich-toolbar" role="toolbar" aria-label="Description formatting tools">
+                    <div className="toolbar-group">
+                      <button
+                        type="button"
+                        className="toolbar-btn toolbar-paste-btn"
+                        onClick={() => handlePasteToDescription(true)}
+                        title="Paste from clipboard"
+                      >
+                        <ClipboardPaste size={14} />
+                        <span>Paste</span>
+                      </button>
+                    </div>
+
+                    <div className="toolbar-divider" />
+
+                    <div className="toolbar-group">
+                      <button
+                        type="button"
+                        className={`toolbar-btn ${editFormData.descriptionAlign === 'left' ? 'active' : ''}`}
+                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'left' }))}
+                        title="Align left"
+                      >
+                        <AlignLeft size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`toolbar-btn ${editFormData.descriptionAlign === 'center' ? 'active' : ''}`}
+                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'center' }))}
+                        title="Align center"
+                      >
+                        <AlignCenter size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`toolbar-btn ${editFormData.descriptionAlign === 'right' ? 'active' : ''}`}
+                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'right' }))}
+                        title="Align right"
+                      >
+                        <AlignRight size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`toolbar-btn ${editFormData.descriptionAlign === 'justify' ? 'active' : ''}`}
+                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'justify' }))}
+                        title="Justify text"
+                      >
+                        <AlignJustify size={14} />
+                      </button>
+                    </div>
+
+                    <div className="toolbar-divider" />
+
+                    <div className="toolbar-group">
+                      <button
+                        type="button"
+                        className={`toolbar-btn ${editFormData.isBold ? 'active' : ''}`}
+                        onClick={() => {
+                          if (editTextareaRef.current?.selectionStart !== editTextareaRef.current?.selectionEnd) {
+                            handleInsertTag(editTextareaRef, '**', '**', true);
+                          } else {
+                            setEditFormData((c) => ({ ...c, isBold: !c.isBold }));
+                          }
+                        }}
+                        title="Bold"
+                      >
+                        <Bold size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`toolbar-btn ${editFormData.isItalic ? 'active' : ''}`}
+                        onClick={() => {
+                          if (editTextareaRef.current?.selectionStart !== editTextareaRef.current?.selectionEnd) {
+                            handleInsertTag(editTextareaRef, '*', '*', true);
+                          } else {
+                            setEditFormData((c) => ({ ...c, isItalic: !c.isItalic }));
+                          }
+                        }}
+                        title="Italic"
+                      >
+                        <Italic size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="toolbar-btn"
+                        onClick={() => handleInsertTag(editTextareaRef, '\n• ', '', true)}
+                        title="Bullet point"
+                      >
+                        <List size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="toolbar-btn"
+                        onClick={() => handleInsertTag(editTextareaRef, '\n> ', '', true)}
+                        title="Quote"
+                      >
+                        <Quote size={14} />
+                      </button>
+                    </div>
+
+                    <div className="toolbar-divider" />
+
+                    <div className="toolbar-color-group">
+                      <span className="toolbar-label" title="Text Color">
+                        <Type size={13} />
+                      </span>
+                      {TEXT_COLORS.map((tc) => (
+                        <button
+                          key={tc.id}
+                          type="button"
+                          className={`color-dot-btn ${editFormData.textColor === tc.color ? 'active' : ''}`}
+                          style={{ backgroundColor: tc.color || 'var(--text-primary)' }}
+                          onClick={() => setEditFormData((c) => ({ ...c, textColor: tc.color }))}
+                          title={tc.label}
+                          aria-label={tc.label}
+                        />
+                      ))}
+                      <label className="custom-color-picker-btn" title="Pick custom text color">
+                        <input
+                          type="color"
+                          className="custom-color-input"
+                          value={editFormData.textColor?.startsWith('#') ? editFormData.textColor : '#1f2937'}
+                          onChange={(e) => setEditFormData((c) => ({ ...c, textColor: e.target.value }))}
+                          aria-label="Custom text color"
+                        />
+                        <Pipette size={11} className="picker-pipette-icon" />
+                      </label>
+                    </div>
+
+                    <div className="toolbar-divider" />
+
+                    <div className="toolbar-group font-select-group">
+                      <span className="toolbar-label" title="Font Style">
+                        <Type size={13} />
+                      </span>
+                      <select
+                        className="font-picker-select"
+                        value={editFormData.fontFamily || ''}
+                        onChange={(e) => setEditFormData((c) => ({ ...c, fontFamily: e.target.value }))}
+                        title="Select Font"
+                        aria-label="Font family"
+                      >
+                        <option value="">Default Font</option>
+                        <optgroup label="── Urdu & Arabic Fonts (خطوط اردو وعربية) ──">
+                          {FONT_OPTIONS.filter((f) => f.group === 'Urdu / Arabic').map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="── English Fonts ──">
+                          {FONT_OPTIONS.filter((f) => f.group === 'English').map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+                  </div>
+
+                  <textarea
+                    ref={editTextareaRef}
+                    rows="7"
+                    value={editFormData.description}
+                    onChange={(event) => setEditFormData((current) => ({ ...current, description: event.target.value }))}
+                    placeholder="Update the thought... (Supports **bold**, *italic*, bullets •)"
+                    dir="auto"
+                    style={{
+                      textAlign: editFormData.descriptionAlign || 'right',
+                      color: editFormData.textColor || undefined,
+                      fontWeight: editFormData.isBold ? '700' : 'normal',
+                      fontStyle: editFormData.isItalic ? 'italic' : 'normal',
+                      fontFamily: getFontFamilyCss(editFormData.fontFamily),
+                    }}
+                  />
+                  <div className="textarea-footer">
+                    <span className="counter-text">{getCounts(editFormData.description)}</span>
+                    <span className="shortcut-hint">Press Ctrl+Enter to save</span>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <div className="field-label-row">
+                    <span className="flex-label">
+                      <Palette size={14} /> Card Background Color
+                    </span>
+                  </div>
+                  <div className="card-color-picker" role="radiogroup" aria-label="Card Color">
+                    {CARD_COLORS.map((col) => (
+                      <button
+                        key={col.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={editFormData.cardColor === col.id}
+                        className={`card-color-swatch swatch-${col.id} ${editFormData.cardColor === col.id ? 'active' : ''}`}
+                        onClick={() => setEditFormData((current) => ({ ...current, cardColor: col.id }))}
+                        title={col.label}
+                        aria-label={col.label}
+                      >
+                        <span className="swatch-indicator" style={col.bg ? { backgroundColor: col.bg } : undefined} />
+                        {editFormData.cardColor === col.id && <Check size={12} className="swatch-check" />}
+                      </button>
+                    ))}
+                    <label className="card-color-custom-label" title="Pick custom card background color">
+                      <input
+                        type="color"
+                        className="custom-color-input"
+                        value={editFormData.cardColor?.startsWith('#') ? editFormData.cardColor : '#ffffff'}
+                        onChange={(e) => setEditFormData((c) => ({ ...c, cardColor: e.target.value }))}
+                        aria-label="Custom card background color"
+                      />
+                      <Pipette size={13} className="custom-picker-icon" />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <div className="field-label-row">
+                    <span>Category</span>
+                    <span className="field-hint">Click a category to select it</span>
+                  </div>
+                  <div className="category-select-chips" role="radiogroup" aria-label="Select category">
+                    {sortedCategories.map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        role="radio"
+                        aria-checked={editFormData.category === category}
+                        className={`category-select-chip ${editFormData.category === category ? 'selected' : ''}`}
+                        onClick={() => setEditFormData((current) => ({ ...current, category }))}
+                      >
+                        <Tag size={13} />
+                        {category}
+                        {editFormData.category === category && <Check size={13} className="chip-check" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="field-row">
+                  <label className="field compact">
+                    <span>Date</span>
+                    <input
+                      type="date"
+                      value={editFormData.entryDate}
+                      onChange={(event) => setEditFormData((current) => ({ ...current, entryDate: event.target.value }))}
+                    />
+                  </label>
+
+                  <div className="field compact">
+                    <span className="field-label-spacer" aria-hidden="true">&nbsp;</span>
+                    <label className="favorite-toggle compact-fav">
+                      <input
+                        type="checkbox"
+                        checked={editFormData.favorite}
+                        onChange={(event) => setEditFormData((current) => ({ ...current, favorite: event.target.checked }))}
+                      />
+                      <Star size={16} className={editFormData.favorite ? 'filled' : ''} /> Add Favorite
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-footer">
+                  <div className="preview-edit-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={handleCancelEditThought}
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="primary-button save-button">
+                      <Save size={16} /> Save changes
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className="reading-content-flow">
+                {/* Academic Metadata & Reader Controls */}
+                <div className="reading-meta-bar">
+                  <div className="reading-meta-left">
+                    <span className="reading-category-pill">
+                      <Tag size={13} />
+                      {selectedThought.category || 'متفرق افکار'}
+                    </span>
+                    <span className="reading-date-pill">
+                      <CalendarDays size={13} />
+                      {formatDate(selectedThought.entryDate || selectedThought.createdAt || selectedThought.timestamp)}
+                    </span>
+                    <span className="reading-readtime-pill" title="تخمینہ مطالعہ">
+                      <Clock size={12} />
+                      {`مطالعہ: ~${Math.max(1, Math.ceil((selectedThought.description || '').trim().split(/\s+/).filter(Boolean).length / 130))} منٹ`}
+                    </span>
+                  </div>
+
+                  {/* Font Size Adjuster for comfortable reading */}
+                  <div className="reading-font-controls" title="فونٹ سائز ایڈجسٹ کریں">
+                    <button
+                      type="button"
+                      className="font-size-step-btn"
+                      onClick={() => handleAdjustFontSize(-2)}
+                      title="فونٹ کا سائز چھوٹا کریں (A-)"
+                      aria-label="Decrease reading font size"
+                    >
+                      A-
+                    </button>
+                    <span className="font-size-val">{readingFontSize}px</span>
+                    <button
+                      type="button"
+                      className="font-size-step-btn"
+                      onClick={() => handleAdjustFontSize(2)}
+                      title="فونٹ کا سائز بڑا کریں (A+)"
+                      aria-label="Increase reading font size"
+                    >
+                      A+
+                    </button>
+                  </div>
+                </div>
+
+                {/* Academic Article Title */}
+                <h1
+                  className="reading-article-title"
+                  dir="auto"
+                  style={{
+                    fontFamily: getFontFamilyCss(selectedThought.fontFamily) || "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif",
+                  }}
+                >
+                  {selectedThought.subject || 'بلا عنوان فکر'}
+                </h1>
+
+                {/* Dedicated Google Gemini SoundPlayer */}
+                <div className="reading-audio-wrapper">
+                  <PostSoundPlayer
+                    thought={selectedThought}
+                    onRequireGeminiKey={() => setIsGeminiModalOpen(true)}
+                    defaultRate={ttsRate}
+                    defaultPitch={ttsPitch}
+                  />
+                </div>
+
+                <div className="academic-ornament" aria-hidden="true">
+                  <span>✦</span>
+                  <span>•</span>
+                  <span>✦</span>
+                  <span>•</span>
+                  <span>✦</span>
+                </div>
+
+                {/* Article Body */}
+                <div
+                  className="reading-article-body"
+                  dir="auto"
+                  style={{
+                    fontSize: `${readingFontSize}px`,
+                    lineHeight: 2.45,
+                    textAlign: selectedThought.descriptionAlign || 'right',
+                    color: selectedThought.textColor || undefined,
+                    fontWeight: selectedThought.isBold ? '700' : undefined,
+                    fontStyle: selectedThought.isItalic ? 'italic' : undefined,
+                    fontFamily: getFontFamilyCss(selectedThought.fontFamily) || "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif",
+                  }}
+                >
+                  {renderFormattedContent(selectedThought.description)}
+                </div>
+
+                <div className="academic-ornament footer-ornament" aria-hidden="true">
+                  <span>✦</span>
+                  <span>•</span>
+                  <span>✦</span>
+                  <span>•</span>
+                  <span>✦</span>
+                </div>
+
+                {/* Article Footnotes & Quick Navigation */}
+                <footer className="reading-page-footer">
+                  <div className="reading-footer-tags">
+                    <span className="footer-tag-item">
+                      <strong>موضوع:</strong> {selectedThought.category || 'متفرق'}
+                    </span>
+                    {selectedThought.fontFamily && (
+                      <span className="footer-tag-item">
+                        <strong>رسم الخط:</strong> {FONT_OPTIONS.find((f) => f.id === selectedThought.fontFamily)?.label || selectedThought.fontFamily}
+                      </span>
+                    )}
+                    {selectedThought.favorite && (
+                      <span className="footer-tag-item favorite-badge">
+                        <Star size={13} className="filled" /> پسندیدہ
+                      </span>
+                    )}
+                  </div>
+                  <div className="reading-footer-nav">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => navigateTo('similar')}
+                      title="مماثل افکار دریافت کریں"
+                    >
+                      <Sparkles size={16} />
+                      <span>مماثل افکار</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={closeSelectedThought}
+                      title="تمام افکار کی طرف واپسی"
+                    >
+                      <ArrowRight size={16} />
+                      <span>واپسی</span>
+                    </button>
+                  </div>
+                </footer>
+              </div>
+            )}
+          </article>
+        ) : (
+          <>
+
         {activeView === 'home' && (
           <CollectionsView
             categories={sortedCategories}
@@ -1272,7 +1995,7 @@ export default function App() {
             setCollectionFavoritesOnly={setCollectionFavoritesOnly}
             formatDate={formatDate}
             summarizeText={summarizeText}
-            setSelectedThought={setSelectedThought}
+            setSelectedThought={handleSelectThought}
             toggleFavorite={toggleFavorite}
             onRequestDeleteThought={requestDeleteThought}
             onAddThought={() => setActiveView('add')}
@@ -1281,6 +2004,21 @@ export default function App() {
             activeSpeakingThoughtId={activeSpeakingThoughtId}
             isLoadingAudio={isLoadingAudio}
             onRequireGeminiKey={() => setIsGeminiModalOpen(true)}
+          />
+        )}
+
+        {activeView === 'similar' && (
+          <SimilarThoughtsView
+            thoughts={thoughts}
+            categories={sortedCategories}
+            formatDate={formatDate}
+            summarizeText={summarizeText}
+            setSelectedThought={handleSelectThought}
+            toggleFavorite={toggleFavorite}
+            onCopyThought={handleCopyThought}
+            onListenThought={handleQuickListenThought}
+            activeSpeakingThoughtId={activeSpeakingThoughtId}
+            isLoadingAudio={isLoadingAudio}
           />
         )}
 
@@ -1864,504 +2602,10 @@ export default function App() {
             }}
           />
         )}
+
+          </>
+        )}
       </main>
-
-      {/* ── Preview / Detail Modal ── */}
-      {selectedThought && (
-        <div className="preview-backdrop" role="dialog" aria-modal="true" onClick={closeSelectedThought}>
-          <div
-            className={`preview-panel ${selectedThought.cardColor && !selectedThought.cardColor.startsWith('#') ? `card-color-${selectedThought.cardColor}` : ''}`}
-            style={selectedThought.cardColor?.startsWith('#') ? { backgroundColor: selectedThought.cardColor } : undefined}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="preview-head">
-              <div>
-                {isEditingThought && <p className="eyebrow">Edit thought</p>}
-                <h3 style={{ fontFamily: getFontFamilyCss(selectedThought.fontFamily) }}>
-                  {selectedThought.subject || 'Untitled thought'}
-                </h3>
-              </div>
-              <div className="preview-actions">
-                {!isEditingThought && (
-                  <>
-                    <button
-                      type="button"
-                      className={`icon-button copy-post-btn ${copiedThought ? 'copied' : ''}`}
-                      onClick={() => handleCopyThought(selectedThought)}
-                      aria-label="Copy thought"
-                      title={copiedThought ? 'Copied!' : 'Copy post'}
-                    >
-                      {copiedThought ? <Check size={17} /> : <Copy size={17} />}
-                    </button>
-
-
-
-                    {/* Translate Thought */}
-                    <button
-                      type="button"
-                      className={`icon-button translate-btn ${showTranslated ? 'active' : ''}`}
-                      onClick={handleToggleTranslateSelected}
-                      disabled={isTranslatingThought}
-                      aria-label="Translate thought"
-                      title={isTranslatingThought ? 'Translating...' : showTranslated ? 'Hide translation' : 'Translate thought'}
-                    >
-                      <Languages size={17} />
-                    </button>
-
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={() => setIsEditingThought(true)}
-                      aria-label="Edit thought"
-                      title="Edit thought"
-                    >
-                      <Pencil size={17} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggleFavorite(selectedThought.id);
-                      }}
-                      aria-label="Toggle favorite in preview"
-                      title={selectedThought.favorite ? 'Remove favorite' : 'Mark favorite'}
-                    >
-                      <Star size={17} className={selectedThought.favorite ? 'filled' : ''} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        requestDeleteThought(selectedThought);
-                      }}
-                      aria-label="Delete thought in preview"
-                      title="Delete thought"
-                    >
-                      <Trash2 size={17} />
-                    </button>
-                  </>
-                )}
-                <button type="button" className="icon-button" onClick={closeSelectedThought} aria-label="Close preview">
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Dedicated Google Gemini SoundPlayer with Track Time (Only visible in full post view) */}
-            {!isEditingThought && (
-              <PostSoundPlayer
-                thought={selectedThought}
-                onRequireGeminiKey={() => setIsGeminiModalOpen(true)}
-                defaultRate={ttsRate}
-                defaultPitch={ttsPitch}
-              />
-            )}
-
-            {/* Translation View Block */}
-            {showTranslated && !isEditingThought && translatedThought && translatedThought.id === selectedThought.id && (
-              <div className="preview-translation-block" dir="auto">
-                <div className="translation-block-header">
-                  <span className="badge-translated">
-                    <Languages size={14} /> Translated ({translatedThought.targetLang === 'ur' ? 'اردو Urdu' : 'English'})
-                  </span>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => setShowTranslated(false)}
-                    title="Close translation"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                {translatedThought.subject && (
-                  <h4 className="translation-title">{translatedThought.subject}</h4>
-                )}
-                <div className="translation-body">
-                  {renderFormattedContent(translatedThought.description)}
-                </div>
-              </div>
-            )}
-
-            {isEditingThought ? (
-              <form
-                className="preview-edit-form"
-                onSubmit={handleUpdateThought}
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    handleUpdateThought();
-                  }
-                }}
-              >
-                <div className="field">
-                  <div className="field-label-row">
-                    <span>Subject</span>
-                    <button
-                      type="button"
-                      className="paste-quick-btn"
-                      onClick={() => handlePasteToSubject(true)}
-                      title="Paste from clipboard into subject"
-                    >
-                      <ClipboardPaste size={12} />
-                      <span>Paste</span>
-                    </button>
-                  </div>
-                  <input
-                    value={editFormData.subject}
-                    onChange={(event) => setEditFormData((current) => ({ ...current, subject: event.target.value }))}
-                    placeholder="Thought subject"
-                    dir="auto"
-                    style={{
-                      fontFamily: getFontFamilyCss(editFormData.fontFamily),
-                    }}
-                  />
-                </div>
-
-                <div className="field">
-                  <div className="field-label-row">
-                    <span>Description</span>
-                    <button
-                      type="button"
-                      className="paste-quick-btn"
-                      onClick={() => handlePasteToDescription(true)}
-                      title="Paste from clipboard into description"
-                    >
-                      <ClipboardPaste size={12} />
-                      <span>Paste</span>
-                    </button>
-                  </div>
-
-                  <div className="rich-toolbar" role="toolbar" aria-label="Description formatting tools">
-                    <div className="toolbar-group">
-                      <button
-                        type="button"
-                        className="toolbar-btn toolbar-paste-btn"
-                        onClick={() => handlePasteToDescription(true)}
-                        title="Paste from clipboard"
-                      >
-                        <ClipboardPaste size={14} />
-                        <span>Paste</span>
-                      </button>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-                    <div className="toolbar-group">
-                      <button
-                        type="button"
-                        className={`toolbar-btn ${editFormData.descriptionAlign === 'left' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'left' }))}
-                        title="Align left"
-                      >
-                        <AlignLeft size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className={`toolbar-btn ${editFormData.descriptionAlign === 'center' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'center' }))}
-                        title="Align center"
-                      >
-                        <AlignCenter size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className={`toolbar-btn ${editFormData.descriptionAlign === 'right' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'right' }))}
-                        title="Align right"
-                      >
-                        <AlignRight size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className={`toolbar-btn ${editFormData.descriptionAlign === 'justify' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'justify' }))}
-                        title="Justify text"
-                      >
-                        <AlignJustify size={14} />
-                      </button>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-                    <div className="toolbar-group">
-                      <button
-                        type="button"
-                        className={`toolbar-btn ${editFormData.isBold ? 'active' : ''}`}
-                        onClick={() => {
-                          if (editTextareaRef.current?.selectionStart !== editTextareaRef.current?.selectionEnd) {
-                            handleInsertTag(editTextareaRef, '**', '**', true);
-                          } else {
-                            setEditFormData((c) => ({ ...c, isBold: !c.isBold }));
-                          }
-                        }}
-                        title="Bold"
-                      >
-                        <Bold size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className={`toolbar-btn ${editFormData.isItalic ? 'active' : ''}`}
-                        onClick={() => {
-                          if (editTextareaRef.current?.selectionStart !== editTextareaRef.current?.selectionEnd) {
-                            handleInsertTag(editTextareaRef, '*', '*', true);
-                          } else {
-                            setEditFormData((c) => ({ ...c, isItalic: !c.isItalic }));
-                          }
-                        }}
-                        title="Italic"
-                      >
-                        <Italic size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="toolbar-btn"
-                        onClick={() => handleInsertTag(editTextareaRef, '\n• ', '', true)}
-                        title="Bullet point"
-                      >
-                        <List size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="toolbar-btn"
-                        onClick={() => handleInsertTag(editTextareaRef, '\n> ', '', true)}
-                        title="Quote"
-                      >
-                        <Quote size={14} />
-                      </button>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-                    <div className="toolbar-color-group">
-                      <span className="toolbar-label" title="Text Color">
-                        <Type size={13} />
-                      </span>
-                      {TEXT_COLORS.map((tc) => (
-                        <button
-                          key={tc.id}
-                          type="button"
-                          className={`color-dot-btn ${editFormData.textColor === tc.color ? 'active' : ''}`}
-                          style={{ backgroundColor: tc.color || 'var(--text-primary)' }}
-                          onClick={() => setEditFormData((c) => ({ ...c, textColor: tc.color }))}
-                          title={tc.label}
-                          aria-label={tc.label}
-                        />
-                      ))}
-                      <label className="custom-color-picker-btn" title="Pick custom text color">
-                        <input
-                          type="color"
-                          className="custom-color-input"
-                          value={editFormData.textColor?.startsWith('#') ? editFormData.textColor : '#1f2937'}
-                          onChange={(e) => setEditFormData((c) => ({ ...c, textColor: e.target.value }))}
-                          aria-label="Custom text color"
-                        />
-                        <Pipette size={11} className="picker-pipette-icon" />
-                      </label>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-                    <div className="toolbar-group font-select-group">
-                      <span className="toolbar-label" title="Font Style">
-                        <Type size={13} />
-                      </span>
-                      <select
-                        className="font-picker-select"
-                        value={editFormData.fontFamily || ''}
-                        onChange={(e) => setEditFormData((c) => ({ ...c, fontFamily: e.target.value }))}
-                        title="Select Font"
-                        aria-label="Font family"
-                      >
-                        <option value="">Default Font</option>
-                        <optgroup label="── Urdu & Arabic Fonts (خطوط اردو وعربية) ──">
-                          {FONT_OPTIONS.filter((f) => f.group === 'Urdu / Arabic').map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="── English Fonts ──">
-                          {FONT_OPTIONS.filter((f) => f.group === 'English').map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
-                    </div>
-                  </div>
-
-                  <textarea
-                    ref={editTextareaRef}
-                    rows="7"
-                    value={editFormData.description}
-                    onChange={(event) => setEditFormData((current) => ({ ...current, description: event.target.value }))}
-                    placeholder="Update the thought... (Supports **bold**, *italic*, bullets •)"
-                    dir="auto"
-                    style={{
-                      textAlign: editFormData.descriptionAlign || 'right',
-                      color: editFormData.textColor || undefined,
-                      fontWeight: editFormData.isBold ? '700' : 'normal',
-                      fontStyle: editFormData.isItalic ? 'italic' : 'normal',
-                      fontFamily: getFontFamilyCss(editFormData.fontFamily),
-                    }}
-                  />
-                  <div className="textarea-footer">
-                    <span className="counter-text">{getCounts(editFormData.description)}</span>
-                    <span className="shortcut-hint">Press Ctrl+Enter to save</span>
-                  </div>
-                </div>
-
-                <div className="field">
-                  <div className="field-label-row">
-                    <span className="flex-label">
-                      <Palette size={14} /> Card Background Color
-                    </span>
-                  </div>
-                  <div className="card-color-picker" role="radiogroup" aria-label="Card Color">
-                    {CARD_COLORS.map((col) => (
-                      <button
-                        key={col.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={editFormData.cardColor === col.id}
-                        className={`card-color-swatch swatch-${col.id} ${editFormData.cardColor === col.id ? 'active' : ''}`}
-                        onClick={() => setEditFormData((current) => ({ ...current, cardColor: col.id }))}
-                        title={col.label}
-                        aria-label={col.label}
-                      >
-                        <span className="swatch-indicator" style={col.bg ? { backgroundColor: col.bg } : undefined} />
-                        {editFormData.cardColor === col.id && <Check size={12} className="swatch-check" />}
-                      </button>
-                    ))}
-                    <label className="card-color-custom-label" title="Pick custom card background color">
-                      <input
-                        type="color"
-                        className="custom-color-input"
-                        value={editFormData.cardColor?.startsWith('#') ? editFormData.cardColor : '#ffffff'}
-                        onChange={(e) => setEditFormData((c) => ({ ...c, cardColor: e.target.value }))}
-                        aria-label="Custom card background color"
-                      />
-                      <Pipette size={13} className="custom-picker-icon" />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="field">
-                  <div className="field-label-row">
-                    <span>Category</span>
-                    <span className="field-hint">Click a category to select it</span>
-                  </div>
-                  <div className="category-select-chips" role="radiogroup" aria-label="Select category">
-                    {sortedCategories.map((category) => (
-                      <button
-                        key={category}
-                        type="button"
-                        role="radio"
-                        aria-checked={editFormData.category === category}
-                        className={`category-select-chip ${editFormData.category === category ? 'selected' : ''}`}
-                        onClick={() => setEditFormData((current) => ({ ...current, category }))}
-                      >
-                        <Tag size={13} />
-                        {category}
-                        {editFormData.category === category && <Check size={13} className="chip-check" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="field-row">
-                  <label className="field compact">
-                    <span>Date</span>
-                    <input
-                      type="date"
-                      value={editFormData.entryDate}
-                      onChange={(event) => setEditFormData((current) => ({ ...current, entryDate: event.target.value }))}
-                    />
-                  </label>
-
-                  <div className="field compact">
-                    <span className="field-label-spacer" aria-hidden="true">&nbsp;</span>
-                    <label className="favorite-toggle compact-fav">
-                      <input
-                        type="checkbox"
-                        checked={editFormData.favorite}
-                        onChange={(event) => setEditFormData((current) => ({ ...current, favorite: event.target.checked }))}
-                      />
-                      <Star size={16} className={editFormData.favorite ? 'filled' : ''} /> Add Favorite
-                    </label>
-                  </div>
-                </div>
-
-                <div className="form-footer">
-                  <div className="preview-edit-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => {
-                        setEditFormData(makeEditForm(selectedThought, categories));
-                        setIsEditingThought(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button type="submit" className="primary-button save-button">
-                      <Save size={16} /> Save changes
-                    </button>
-                  </div>
-                </div>
-              </form>
-            ) : (
-              <div className="preview-content">
-                <div
-                  className="preview-description"
-                  dir="auto"
-                  style={{
-                    textAlign: selectedThought.descriptionAlign || 'right',
-                    color: selectedThought.textColor || undefined,
-                    fontWeight: selectedThought.isBold ? '700' : undefined,
-                    fontStyle: selectedThought.isItalic ? 'italic' : undefined,
-                    fontFamily: getFontFamilyCss(selectedThought.fontFamily),
-                  }}
-                >
-                  {renderFormattedContent(selectedThought.description)}
-                </div>
-
-                <div className="preview-meta-list">
-                  <div className="preview-meta-item">
-                    <span>Category</span>
-                    <strong>{selectedThought.category || 'General'}</strong>
-                  </div>
-                  <div className="preview-meta-item">
-                    <span>Captured</span>
-                    <strong>{formatDate(selectedThought.entryDate || selectedThought.createdAt || selectedThought.timestamp)}</strong>
-                  </div>
-                  <div className="preview-meta-item">
-                    <span>Favorite</span>
-                    <strong>{selectedThought.favorite ? 'Yes' : 'No'}</strong>
-                  </div>
-                  {selectedThought.fontFamily && (
-                    <div className="preview-meta-item">
-                      <span>Font</span>
-                      <strong>
-                        {FONT_OPTIONS.find((f) => f.id === selectedThought.fontFamily)?.label || selectedThought.fontFamily}
-                      </strong>
-                    </div>
-                  )}
-                  {selectedThought.cardColor && selectedThought.cardColor !== 'default' && (
-                    <div className="preview-meta-item">
-                      <span>Card Style</span>
-                      <strong style={{ textTransform: 'capitalize' }}>{selectedThought.cardColor}</strong>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Floating Paste Toast ── */}
       {pasteToast && (
@@ -2392,24 +2636,45 @@ export default function App() {
         }}
       />
 
+      {/* ── Desktop FAB: Add Thought ── */}
+      <button
+        type="button"
+        className={`desktop-fab ${activeView === 'add' ? 'active' : ''}`}
+        onClick={() => handleSwitchView(activeView === 'add' ? 'home' : 'add')}
+        aria-label="Add new thought"
+        title="Add new thought"
+      >
+        {activeView === 'add' ? <X size={24} /> : <Plus size={24} />}
+      </button>
+
       {/* ── Mobile Bottom Navigation Bar (Ergonomic for Phones & Tablets) ── */}
       <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
         <button
           type="button"
           className={`mobile-nav-item ${activeView === 'home' ? 'active' : ''}`}
-          onClick={() => setActiveView('home')}
+          onClick={() => handleSwitchView('home')}
           aria-label="Home"
         >
-          <BookOpen size={20} />
-          <span>Home</span>
+          <BookOpen size={19} />
+          <span>تمام افکار</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-nav-item ${activeView === 'similar' ? 'active' : ''}`}
+          onClick={() => handleSwitchView('similar')}
+          aria-label="Similar"
+        >
+          <Layers size={19} />
+          <span>مماثل افکار</span>
         </button>
 
         <button
           type="button"
           className={`mobile-nav-fab ${activeView === 'add' ? 'active' : ''}`}
-          onClick={() => setActiveView('add')}
+          onClick={() => handleSwitchView('add')}
           aria-label="New Thought"
-          title="Add New Thought / Voice Typing"
+          title="نیا فکر تحریر کریں"
         >
           <Plus size={26} />
         </button>
@@ -2417,21 +2682,13 @@ export default function App() {
         <button
           type="button"
           className={`mobile-nav-item ${activeView === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveView('settings')}
+          onClick={() => handleSwitchView('settings')}
           aria-label="Settings"
         >
-          <Settings size={20} />
-          <span>Settings</span>
+          <Settings size={19} />
+          <span>ترتیبات</span>
         </button>
       </nav>
     </div>
   );
 }
-
-// SPA Navigation helper and hashchange sync
-
-// Capacitor Android hardware back button handler
-
-// Academic reading page layout
-
-// Circular back icon button and share link
