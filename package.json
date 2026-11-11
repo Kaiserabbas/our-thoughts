@@ -1,12 +1,12 @@
 {
-  "name": "thought-organizer",
+  "name": "our-thoughts",
   "private": true,
   "version": "1.0.0",
-  "description": "Scholarly digital compendium and personal knowledge repository with Jameel Noori Nastaleeq typography, academic reading mode, and thematic strands",
+  "description": "Scholarly digital compendium and thought organizer with Jameel Noori Nastaleeq typography, academic reading mode, and thematic strands",
   "author": "Kaiser Abbas <@Kaiserabbas>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Kaiserabbas/thought-organizer.git"
+    "url": "https://github.com/Kaiserabbas/our-thoughts.git"
   },
   "type": "module",
   "scripts": {

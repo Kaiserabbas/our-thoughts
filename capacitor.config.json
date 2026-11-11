@@ -1,6 +1,6 @@
 {
-  "appId": "com.kaiserabbas.thoughtorganizer",
-  "appName": "Thought Organizer",
+  "appId": "com.kaiserabbas.ourthoughts",
+  "appName": "Our Thoughts",
   "webDir": "dist",
   "server": {
     "androidScheme": "https",

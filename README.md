@@ -1,4 +1,4 @@
-# Thought Organizer (مجموعۂ افکار و علمی ذخیرہ)
+# Our Thoughts (مجموعۂ افکار و علمی ذخیرہ)
 
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.1-646CFF.svg)](https://vitejs.dev/)
@@ -6,7 +6,7 @@
 [![Deployment](https://img.shields.io/badge/Deploy-Vercel%20%7C%20Netlify-black.svg)](https://vercel.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Thought Organizer** is an academic-grade digital compendium and personal knowledge repository designed for cataloging, contemplating, and exploring profound literary, historical, philosophical, and spiritual reflections. Built with native support for classical **Jameel Noori Nastaleeq** (خط نستعلیق), modern Urdu typography, and English prose.
+> **Our Thoughts** is an academic-grade digital compendium and personal knowledge repository designed for cataloging, contemplating, and exploring profound literary, historical, philosophical, and spiritual reflections. Built with native support for classical **Jameel Noori Nastaleeq** (خط نستعلیق), modern Urdu typography, and English prose.
 
 ---
 
@@ -63,7 +63,7 @@
 ## 🏗️ Architecture
 
 ```
-thought-organizer/
+our-thoughts/
 ├── src/
 │   ├── App.jsx                 # Main application shell, hash router, and full reading view
 │   ├── App.css                 # Academic typography, Oxford theme, and responsive styling
@@ -92,8 +92,8 @@ thought-organizer/
 
 ```bash
 # Clone the repository
-git clone https://github.com/Kaiserabbas/thought-organizer.git
-cd thought-organizer
+git clone https://github.com/Kaiserabbas/our-thoughts.git
+cd our-thoughts
 
 # Install dependencies
 npm install
