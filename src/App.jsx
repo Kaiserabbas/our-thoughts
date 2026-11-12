@@ -106,9 +106,9 @@ const TEXT_COLORS = [
 ];
 
 function makeBlankForm(categories) {
-  let defaultAuthor = '';
+  let defaultAuthor = 'Qaisar';
   try {
-    defaultAuthor = localStorage.getItem('thought_organizer_default_author') || '';
+    defaultAuthor = localStorage.getItem('thought_organizer_default_author') || 'Qaisar';
   } catch {}
   return {
     subject: '',
@@ -130,7 +130,7 @@ function makeEditForm(thought, categories) {
   return {
     subject: thought?.subject || '',
     description: thought?.description || '',
-    author: thought?.author || '',
+    author: thought?.author || 'Qaisar',
     category: thought?.category || categories[0] || DEFAULT_CATEGORIES[0],
     entryDate: String(thought?.entryDate || new Date().toISOString().slice(0, 10)).slice(0, 10),
     favorite: Boolean(thought?.favorite),
@@ -253,7 +253,7 @@ function mergeThoughts(local, remote, deletedIds = []) {
   // Add remote thoughts first (unless deleted)
   (remote || []).forEach((thought) => {
     if (thought && thought.id && !deletedSet.has(thought.id)) {
-      map.set(thought.id, thought);
+      map.set(thought.id, { ...thought, author: thought.author || 'Qaisar' });
     }
   });
 
@@ -262,12 +262,12 @@ function mergeThoughts(local, remote, deletedIds = []) {
     if (thought && thought.id && !deletedSet.has(thought.id)) {
       const existing = map.get(thought.id);
       if (!existing) {
-        map.set(thought.id, thought);
+        map.set(thought.id, { ...thought, author: thought.author || 'Qaisar' });
       } else {
         const localTime = Number(thought.updatedAt || thought.createdAt || thought.timestamp || 0);
         const existingTime = Number(existing.updatedAt || existing.createdAt || existing.timestamp || 0);
         if (localTime >= existingTime) {
-          map.set(thought.id, thought);
+          map.set(thought.id, { ...thought, author: thought.author || existing.author || 'Qaisar' });
         }
       }
     }
@@ -322,13 +322,19 @@ export default function App() {
   });
 
   const [thoughts, setThoughts] = useState(() => {
-    const defaultList = Array.isArray(initialData?.thoughts) ? initialData.thoughts : [];
+    const defaultList = (Array.isArray(initialData?.thoughts) ? initialData.thoughts : []).map((t) => ({
+      ...t,
+      author: t.author || 'Qaisar',
+    }));
     if (typeof window === 'undefined') return defaultList;
     try {
       const saved = localStorage.getItem('cached_thoughts');
       const parsed = JSON.parse(saved || 'null');
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return mergeThoughts(parsed, defaultList);
+        return mergeThoughts(parsed, defaultList).map((t) => ({
+          ...t,
+          author: t.author || 'Qaisar',
+        }));
       }
       return defaultList;
     } catch {
@@ -1197,18 +1203,19 @@ export default function App() {
     if (event) event.preventDefault();
     const subject = formData.subject.trim();
     const description = formData.description.trim();
-    if (!subject && !description) return;
-
-    const author = formData.author ? formData.author.trim() : '';
-    if (author) {
-      try {
-        localStorage.setItem('thought_organizer_default_author', author);
-      } catch {}
+    if (!subject && !description) {
+      showPasteToast('براہ کرم عنوان یا متن درج کریں (Please enter subject or description)');
+      return;
     }
+
+    const author = (formData.author ? formData.author.trim() : '') || 'Qaisar';
+    try {
+      localStorage.setItem('thought_organizer_default_author', author);
+    } catch {}
 
     const nextThought = {
       id: crypto.randomUUID(),
-      subject: subject || 'Untitled thought',
+      subject: subject || 'بلا عنوان فکر',
       description,
       author,
       category: formData.category || categories[0] || DEFAULT_CATEGORIES[0],
@@ -1228,7 +1235,9 @@ export default function App() {
     setThoughts(updatedThoughts);
     setFormData(makeBlankForm(sortedCategories));
     setActiveView('home');
+    navigateTo('');
     setStatus('Saved Locally');
+    showPasteToast(`✓ فکر "${nextThought.subject}" کامیابی سے شامل کر لیا گیا! (Thought added successfully)`);
 
     if (token) {
       await syncWithDrive(updatedThoughts, categories, { directPush: true });
@@ -1244,6 +1253,7 @@ export default function App() {
     setCategories(nextCategories);
     setFormData((current) => ({ ...current, category: trimmed }));
     setStatus('Category added');
+    showPasteToast(`✓ زمرہ "${trimmed}" شامل کر لیا گیا (Category added)`);
 
     if (token) {
       await syncWithDrive(thoughts, nextCategories, { directPush: true });
@@ -1254,9 +1264,10 @@ export default function App() {
   const requestDeleteCategory = (categoryName, count) => {
     setConfirmModal({
       isOpen: true,
-      title: 'Confirm Category Deletion',
-      message: `Are you sure you want to delete "${categoryName}"? ${count} ${count === 1 ? 'thought' : 'thoughts'} will be moved to the default category.`,
-      confirmText: 'Delete Category',
+      title: 'زمرہ حذف کرنے کی تصدیق (Confirm Category Deletion)',
+      message: `کیا آپ واقعی زمرہ "${categoryName}" کو حذف کرنا چاہتے ہیں؟ اس کے ${count} ${count === 1 ? 'فکر' : 'افکار'} بنیادی زمرے میں منتقل کر دیے جائیں گے۔ (Are you sure you want to delete this category?)`,
+      confirmText: 'حذف کریں (Delete Category)',
+      cancelText: 'منسوخ (Cancel)',
       action: () => executeDeleteCategory(categoryName),
     });
   };
@@ -1278,6 +1289,7 @@ export default function App() {
     setFormData((current) => ({ ...current, category: current.category === categoryName ? fallbackCategory : current.category }));
     setEditFormData((current) => ({ ...current, category: current.category === categoryName ? fallbackCategory : current.category }));
     setStatus('Category removed');
+    showPasteToast(`زمرہ "${categoryName}" حذف کر دیا گیا (Category deleted)`);
 
     if (token) {
       await syncWithDrive(updatedThoughts, fallbackCategories, { directPush: true });
@@ -1302,17 +1314,20 @@ export default function App() {
 
   // Request thought deletion with confirmation
   const requestDeleteThought = (thought) => {
+    if (!thought) return;
+    const thoughtTitle = thought.subject ? `"${thought.subject}"` : 'اس فکر';
     setConfirmModal({
       isOpen: true,
-      title: 'Confirm Deletion',
-      message: `Are you sure you want to delete "${thought.subject || 'Untitled thought'}"? This action cannot be undone.`,
-      confirmText: 'Delete Thought',
-      action: () => executeDeleteThought(thought.id),
+      title: 'حذف کرنے کی تصدیق (Confirm Deletion)',
+      message: `کیا آپ واقعی ${thoughtTitle} کو ہمیشہ کے لیے حذف کرنا چاہتے ہیں؟ یہ عمل واپس نہیں لیا جا سکے گا۔ (Are you sure you want to delete this thought?)`,
+      confirmText: 'ہاں، حذف کریں (Delete Thought)',
+      cancelText: 'منسوخ (Cancel)',
+      action: () => executeDeleteThought(thought.id, thought.subject),
     });
   };
 
   // Execute thought deletion
-  const executeDeleteThought = async (id) => {
+  const executeDeleteThought = async (id, subject) => {
     const nextDeletedIds = [...new Set([...deletedThoughtIds, id])];
     setDeletedThoughtIds(nextDeletedIds);
     localStorage.setItem('cached_deleted_thought_ids', JSON.stringify(nextDeletedIds));
@@ -1327,6 +1342,7 @@ export default function App() {
       navigateTo('', true);
     }
     setStatus('Thought removed');
+    showPasteToast(`فکر ${subject ? `"${subject}"` : ''} کامیابی سے حذف کر دیا گیا (Thought deleted)`);
 
     if (token) {
       await syncWithDrive(updatedThoughts, categories, { deletedIds: nextDeletedIds, directPush: true });
@@ -1342,16 +1358,14 @@ export default function App() {
     const description = editFormData.description.trim();
     if (!subject && !description) return;
 
-    const author = editFormData.author ? editFormData.author.trim() : '';
-    if (author) {
-      try {
-        localStorage.setItem('thought_organizer_default_author', author);
-      } catch {}
-    }
+    const author = (editFormData.author ? editFormData.author.trim() : '') || 'Qaisar';
+    try {
+      localStorage.setItem('thought_organizer_default_author', author);
+    } catch {}
 
     const updatedThought = {
       ...selectedThought,
-      subject: subject || 'Untitled thought',
+      subject: subject || 'بلا عنوان فکر',
       description,
       author,
       category: editFormData.category || categories[0] || DEFAULT_CATEGORIES[0],
@@ -1371,6 +1385,7 @@ export default function App() {
     setSelectedThought(updatedThought);
     setIsEditingThought(false);
     setStatus('Saved Locally');
+    showPasteToast(`✓ فکر "${updatedThought.subject}" میں تبدیلیاں محفوظ ہو گئیں! (Changes saved)`);
     navigateTo(`thought/${updatedThought.id}`, true);
 
     if (token) {
@@ -1702,7 +1717,7 @@ export default function App() {
                   <input
                     value={editFormData.author || ''}
                     onChange={(event) => setEditFormData((current) => ({ ...current, author: event.target.value }))}
-                    placeholder="آپ کا نام یا قلم کار کا نام (e.g. Kaiser Abbas)"
+                    placeholder="آپ کا نام یا قلم کار کا نام (e.g. Qaisar)"
                     dir="auto"
                   />
                 </div>
@@ -2444,7 +2459,7 @@ export default function App() {
                     <input
                       value={formData.author || ''}
                       onChange={(event) => setFormData((current) => ({ ...current, author: event.target.value }))}
-                      placeholder="آپ کا نام یا قلم کار کا نام (e.g. Kaiser Abbas)"
+                      placeholder="آپ کا نام یا قلم کار کا نام (e.g. Qaisar)"
                       dir="auto"
                     />
                   </div>
@@ -2925,6 +2940,7 @@ export default function App() {
         title={confirmModal.title}
         message={confirmModal.message}
         confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText || 'منسوخ (Cancel)'}
         onConfirm={() => {
           if (confirmModal.action) confirmModal.action();
         }}
