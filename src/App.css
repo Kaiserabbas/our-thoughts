@@ -7576,6 +7576,16 @@ h1 {
   }
 }
 
+.composer-subject-field {
+  scroll-margin-top: 32px;
+}
+
+@media (max-width: 640px) {
+  .composer-subject-field {
+    scroll-margin-top: 18px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-shell *,
   .app-shell *::before,

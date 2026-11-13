@@ -520,16 +520,39 @@ export default function App() {
     else navigateTo(view);
   }, [navigateTo]);
 
+  const addSubjectFieldRef = useRef(null);
+  const addSubjectInputRef = useRef(null);
+
+  const scrollToSubjectSection = useCallback(() => {
+    setTimeout(() => {
+      if (addSubjectFieldRef.current) {
+        addSubjectFieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      if (addSubjectInputRef.current) {
+        addSubjectInputRef.current.focus({ preventScroll: true });
+      }
+    }, 140);
+  }, []);
+
+  useEffect(() => {
+    if (activeView === 'add') {
+      scrollToSubjectSection();
+    }
+  }, [activeView, scrollToSubjectSection]);
+
   const requestProtectedView = useCallback((targetView) => {
     if (isUnlocked) {
       handleSwitchView(targetView);
+      if (targetView === 'add') {
+        scrollToSubjectSection();
+      }
     } else {
       setPendingTargetView(targetView);
       setPasswordInput('');
       setPasswordError('');
       setPasswordModalOpen(true);
     }
-  }, [isUnlocked, handleSwitchView]);
+  }, [isUnlocked, handleSwitchView, scrollToSubjectSection]);
 
   const handlePasswordSubmit = (e) => {
     if (e) e.preventDefault();
@@ -548,6 +571,9 @@ export default function App() {
       const target = pendingTargetView || 'add';
       setPendingTargetView(null);
       handleSwitchView(target);
+      if (target === 'add') {
+        scrollToSubjectSection();
+      }
       setPasteToast(
         rememberPassword
           ? 'رسائی منظور! پاس ورڈ محفوظ کر لیا گیا (Password saved)'
@@ -2464,7 +2490,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="field">
+                  <div className="field composer-subject-field" ref={addSubjectFieldRef} id="composer-subject-section">
                     <div className="field-label-row">
                       <span>Subject</span>
                       <button
@@ -2478,6 +2504,7 @@ export default function App() {
                       </button>
                     </div>
                     <input
+                      ref={addSubjectInputRef}
                       value={formData.subject}
                       onChange={(event) => setFormData((current) => ({ ...current, subject: event.target.value }))}
                       placeholder="What sparked this thought?"
@@ -2992,7 +3019,13 @@ export default function App() {
         <button
           type="button"
           className={`mobile-nav-fab ${activeView === 'add' ? 'active' : ''}`}
-          onClick={() => requestProtectedView('add')}
+          onClick={() => {
+            if (activeView === 'add') {
+              scrollToSubjectSection();
+            } else {
+              requestProtectedView('add');
+            }
+          }}
           aria-label="New Thought"
           title="نیا فکر تحریر کریں"
         >
