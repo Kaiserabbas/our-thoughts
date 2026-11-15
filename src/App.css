@@ -8050,6 +8050,10 @@ h1 {
 }
 
 /* ── Netlify Drawer / Feedback / Badge Suppression ── */
+#nl-badge-frame,
+iframe#nl-badge-frame,
+[id*="nl-badge"],
+[class*="nl-badge"],
 netlify-drawer,
 #netlify-drawer,
 .netlify-badge,
@@ -8067,5 +8071,5 @@ div[class*="netlify-drawer"] {
   position: absolute !important;
   top: -9999px !important;
   left: -9999px !important;
-  z-index: -1 !important;
+  z-index: -999 !important;
 }

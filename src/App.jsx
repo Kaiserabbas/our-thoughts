@@ -664,9 +664,13 @@ export default function App() {
     }
   }, []);
 
-  // Suppress and remove injected Netlify HUD/Drawer feedback elements
+  // Suppress and remove injected Netlify HUD/Drawer/Badge feedback elements
   useEffect(() => {
     const selectors = [
+      '#nl-badge-frame',
+      'iframe#nl-badge-frame',
+      '[id*="nl-badge"]',
+      '[class*="nl-badge"]',
       'netlify-drawer',
       '#netlify-drawer',
       '.netlify-badge',

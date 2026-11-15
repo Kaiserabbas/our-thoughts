@@ -12,7 +12,11 @@
     <meta name="netlify-disable-drawer" content="true" />
     <title>Thought Organizer</title>
     <style>
-      /* Suppress Netlify Drawer / Feedback overlay */
+      /* Suppress Netlify Drawer / Feedback overlay / Badge */
+      #nl-badge-frame,
+      iframe#nl-badge-frame,
+      [id*="nl-badge"],
+      [class*="nl-badge"],
       netlify-drawer,
       #netlify-drawer,
       .netlify-badge,
@@ -27,6 +31,10 @@
         opacity: 0 !important;
         width: 0 !important;
         height: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+        top: -9999px !important;
+        z-index: -999 !important;
       }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
