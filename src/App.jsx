@@ -1,8 +1,5 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser';
-import { App as CapApp } from '@capacitor/app';
-import { GoogleDriveService } from './googleDrive';
+import { CloudVaultService } from './cloudVaultService';
 import CollectionsView from './CollectionsView';
 import SimilarThoughtsView from './SimilarThoughtsView';
 import SettingsView from './SettingsView';
@@ -70,7 +67,6 @@ import {
 } from 'lucide-react';
 import { getFontFamilyCss, getCategoriesByUsage, FONT_OPTIONS } from './fontUtils';
 
-const CLIENT_ID = '574535920766-ntjn0mr37h07sd3l1n5c3o2j4na7bqok.apps.googleusercontent.com';
 const DEFAULT_CATEGORIES = Array.isArray(initialData?.categories) && initialData.categories.length
   ? initialData.categories
   : ['Political', 'Religious', 'Poetry', 'Economics'];
@@ -146,18 +142,6 @@ function makeEditForm(thought, categories) {
 function normalizeCategories(categories) {
   const parsed = Array.isArray(categories) ? categories.filter(Boolean) : [];
   return parsed.length ? parsed : DEFAULT_CATEGORIES;
-}
-
-function normalizeSnapshot(payload) {
-  if (!payload || typeof payload !== 'object') {
-    return { thoughts: [], categories: DEFAULT_CATEGORIES, deletedThoughtIds: [] };
-  }
-
-  return {
-    thoughts: Array.isArray(payload.thoughts) ? payload.thoughts : [],
-    categories: normalizeCategories(payload.categories),
-    deletedThoughtIds: Array.isArray(payload.deletedThoughtIds) ? payload.deletedThoughtIds : [],
-  };
 }
 
 function formatDate(value) {
@@ -310,16 +294,8 @@ export default function App() {
     return localStorage.getItem('app_theme') || 'light';
   });
 
-  const [token, setToken] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('gdrive_token') || null;
-  });
-
-  const [tokenExpiry, setTokenExpiry] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    const expiry = localStorage.getItem('gdrive_token_expires_at');
-    return expiry ? Number(expiry) : null;
-  });
+  const [deviceConnected, setDeviceConnected] = useState(() => CloudVaultService.isConnected());
+  const [connectedDevices, setConnectedDevices] = useState([]);
 
   const [thoughts, setThoughts] = useState(() => {
     const defaultList = (Array.isArray(initialData?.thoughts) ? initialData.thoughts : []).map((t) => ({
@@ -388,7 +364,12 @@ export default function App() {
   const [collectionSelectedCategory, setCollectionSelectedCategory] = useState('All');
   const [collectionFavoritesOnly, setCollectionFavoritesOnly] = useState(false);
   const [activeView, setActiveView] = useState('home');
-  const [status, setStatus] = useState('Ready');
+  const [status, setStatus] = useState(() => {
+    if (typeof window !== 'undefined' && CloudVaultService.isConnected()) {
+      return 'Synced across devices';
+    }
+    return 'Ready';
+  });
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedThought, setSelectedThought] = useState(null);
   const [isEditingThought, setIsEditingThought] = useState(false);
@@ -740,8 +721,6 @@ export default function App() {
 
   const addTextareaRef = useRef(null);
   const editTextareaRef = useRef(null);
-  const tokenClientRef = useRef(null);
-  const syncedTokenRef = useRef(null);
   const isSyncingRef = useRef(false);
   const queuedSyncRef = useRef(null);
 
@@ -796,141 +775,28 @@ export default function App() {
     }
   }, [deletedThoughtIds]);
 
-  // URL Hash OAuth token parser (for redirect-based OAuth callbacks)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      try {
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get('access_token');
-        const expiresIn = params.get('expires_in');
-        if (accessToken) {
-          localStorage.setItem('gdrive_token', accessToken);
-          setToken(accessToken);
-          if (expiresIn) {
-            const expiresAt = Date.now() + Number(expiresIn) * 1000;
-            localStorage.setItem('gdrive_token_expires_at', String(expiresAt));
-            setTokenExpiry(expiresAt);
-          }
-          setStatus('Connected');
-          window.history.replaceState(null, '', window.location.pathname);
-        }
-      } catch (err) {
-        console.error('Error parsing token hash:', err);
-      }
-    }
-  }, []);
-
-  // Deep Link Listener for Mobile APK (OAuth callback via custom scheme)
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      const sub = CapApp.addListener('appUrlOpen', async (data) => {
-        try {
-          const url = data.url;
-          if (url && (url.includes('access_token=') || url.includes('token='))) {
-            await Browser.close().catch(() => {});
-            const rawParams = url.includes('#') ? url.split('#')[1] : url.split('?')[1];
-            const params = new URLSearchParams(rawParams);
-            const accessToken = params.get('access_token') || params.get('token');
-            const expiresIn = params.get('expires_in');
-            if (accessToken) {
-              localStorage.setItem('gdrive_token', accessToken);
-              setToken(accessToken);
-              if (expiresIn) {
-                const expiresAt = Date.now() + Number(expiresIn) * 1000;
-                localStorage.setItem('gdrive_token_expires_at', String(expiresAt));
-                setTokenExpiry(expiresAt);
-              }
-              setStatus('Connected');
-            }
-          }
-        } catch (err) {
-          console.error('Error handling deep link:', err);
-        }
-      });
-
-      return () => {
-        sub.then((s) => s.remove());
-      };
-    }
-  }, []);
-
-  // Google OAuth Client for Web
-  useEffect(() => {
-    const initGoogle = () => {
-      if (window.google?.accounts?.oauth2) {
-        tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/drive.file',
-          callback: async (response) => {
-            if (response.error) {
-              setStatus('Auth Error');
-              return;
-            }
-
-            localStorage.setItem('gdrive_token', response.access_token);
-            setToken(response.access_token);
-
-            if (response.expires_in) {
-              const expiresAt = Date.now() + Number(response.expires_in) * 1000;
-              localStorage.setItem('gdrive_token_expires_at', String(expiresAt));
-              setTokenExpiry(expiresAt);
-            }
-
-            setStatus('Connected');
-          },
-        });
-        return true;
-      }
-      return false;
-    };
-
-    if (initGoogle()) return undefined;
-
-    const interval = window.setInterval(() => {
-      if (initGoogle()) window.clearInterval(interval);
-    }, 200);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
-  const clearGoogleToken = useCallback(() => {
-    localStorage.removeItem('gdrive_token');
-    localStorage.removeItem('gdrive_token_expires_at');
-    syncedTokenRef.current = null;
-    setToken(null);
-    setTokenExpiry(null);
-    setStatus('Auth expired');
-  }, []);
-
   // Online / Offline listener
   useEffect(() => {
-    const handleOnline = () => {
-      setStatus(token ? 'Connected' : 'Ready');
-    };
-    const handleOffline = () => {
-      setStatus('Offline (Saved locally)');
-    };
-
+    const handleOnline = () => setStatus(deviceConnected ? 'Synced across devices' : 'Ready');
+    const handleOffline = () => setStatus('Offline (Saved locally)');
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [token]);
+  }, [deviceConnected]);
 
-  // Synchronize with Google Drive
-  const syncWithDrive = useCallback(async (
+  // Master Sync: Cloud Vault cross-device sync
+  const performSync = useCallback(async (
     currentThoughts = thoughts,
     currentCategories = categories,
     options = {}
   ) => {
-    const { deletedIds = deletedThoughtIds, directPush = false, forcePull = false } = options;
+    const { deletedIds = deletedThoughtIds, directPush = false } = options;
 
-    if (!token || (tokenExpiry && Date.now() >= tokenExpiry)) {
-      if (token) clearGoogleToken();
+    if (!CloudVaultService.isConnected()) {
+      setStatus('Saved Locally');
       return;
     }
 
@@ -949,50 +815,44 @@ export default function App() {
     setStatus('Syncing...');
 
     try {
-      const folderId = await GoogleDriveService.getOrCreateFolder(token);
-      const { fileId: activeFileId, isNew } = await GoogleDriveService.getOrCreateDataFile(token, folderId);
+      const remoteVault = await CloudVaultService.downloadSnapshot();
+      let finalThoughts = currentThoughts;
+      let finalCategories = currentCategories;
+      let combinedDeleted = deletedIds;
 
-      if (isNew || directPush) {
-        const snapshot = {
-          thoughts: currentThoughts,
-          categories: currentCategories,
-          deletedThoughtIds: deletedIds,
-          lastSyncedAt: Date.now(),
-        };
-        await GoogleDriveService.uploadThoughts(token, activeFileId, snapshot);
-      } else {
-        const remoteState = normalizeSnapshot(await GoogleDriveService.downloadThoughts(token, activeFileId));
-        const combinedDeleted = [...new Set([...deletedIds, ...(remoteState.deletedThoughtIds || [])])];
+      if (remoteVault) {
+        const remoteDeleted = remoteVault.deletedThoughtIds || [];
+        combinedDeleted = [...new Set([...deletedIds, ...remoteDeleted])];
         setDeletedThoughtIds(combinedDeleted);
 
-        let finalThoughts;
-        let finalCategories;
-
-        if (forcePull && remoteState.thoughts.length > 0) {
-          finalThoughts = mergeThoughts(currentThoughts, remoteState.thoughts, combinedDeleted);
-          finalCategories = mergeCategories(currentCategories, remoteState.categories);
-        } else {
-          finalThoughts = mergeThoughts(currentThoughts, remoteState.thoughts, combinedDeleted);
-          finalCategories = mergeCategories(currentCategories, remoteState.categories);
+        if (!remoteVault.isNew && !directPush) {
+          finalThoughts = mergeThoughts(currentThoughts, remoteVault.thoughts || [], combinedDeleted).map((t) => ({
+            ...t,
+            author: t.author || 'Qaisar',
+          }));
+          finalCategories = mergeCategories(currentCategories, remoteVault.categories || []);
         }
 
         setThoughts(finalThoughts);
         setCategories(finalCategories);
 
-        await GoogleDriveService.uploadThoughts(token, activeFileId, {
+        const result = await CloudVaultService.uploadSnapshot({
           thoughts: finalThoughts,
           categories: finalCategories,
           deletedThoughtIds: combinedDeleted,
-          lastSyncedAt: Date.now(),
+          devices: remoteVault.devices || [],
+          bannedDeviceIds: remoteVault.bannedDeviceIds || [],
         });
+        if (result?.devices) setConnectedDevices(result.devices);
       }
 
-      setStatus('Saved to Drive');
+      setStatus('Synced across devices');
     } catch (error) {
       console.error('Sync error:', error);
-      if (error?.status === 401) {
-        clearGoogleToken();
-        setStatus('Auth expired');
+      if (error.message?.includes('removed by an admin')) {
+        CloudVaultService.disconnectDevice();
+        setDeviceConnected(false);
+        setStatus('Device removed by admin');
       } else {
         setStatus('Sync Error');
       }
@@ -1003,19 +863,80 @@ export default function App() {
       if (queuedSyncRef.current) {
         const next = queuedSyncRef.current;
         queuedSyncRef.current = null;
-        syncWithDrive(next.currentThoughts, next.currentCategories, next.options);
+        performSync(next.currentThoughts, next.currentCategories, next.options);
       }
     }
-  }, [categories, clearGoogleToken, deletedThoughtIds, thoughts, token, tokenExpiry]);
+  }, [categories, deletedThoughtIds, thoughts]);
 
+  const syncWithDrive = performSync;
+
+  // Auto-sync on startup if connected
   useEffect(() => {
-    if (!token || syncedTokenRef.current === token) {
-      return;
+    if (deviceConnected && navigator.onLine) {
+      performSync(thoughts, categories);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceConnected]);
 
-    syncedTokenRef.current = token;
-    syncWithDrive(thoughts, categories);
-  }, [token, thoughts, categories, syncWithDrive]);
+  // Real-time synchronization when switching devices/tabs
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (deviceConnected && navigator.onLine && !isSyncingRef.current) {
+        performSync(thoughts, categories);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && deviceConnected && navigator.onLine && !isSyncingRef.current) {
+        performSync(thoughts, categories);
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const interval = window.setInterval(() => {
+      if (deviceConnected && navigator.onLine && !isSyncingRef.current) {
+        performSync(thoughts, categories);
+      }
+    }, 45000);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.clearInterval(interval);
+    };
+  }, [deviceConnected, thoughts, categories, performSync]);
+
+  // Connect device with password
+  const handleConnectDevice = async (password) => {
+    if (!CloudVaultService.verifyConnectPassword(password)) {
+      return { success: false, error: 'Incorrect password. Try "OurThoughts".' };
+    }
+    CloudVaultService.connectDevice();
+    setDeviceConnected(true);
+    setStatus('Connecting...');
+    await performSync(thoughts, categories, { forcePull: true });
+    return { success: true };
+  };
+
+  const handleDisconnectDevice = () => {
+    CloudVaultService.disconnectDevice();
+    setDeviceConnected(false);
+    setConnectedDevices([]);
+    setStatus('Disconnected');
+  };
+
+  const handleRemoveDevice = async (targetDeviceId, adminPassword) => {
+    if (!CloudVaultService.verifyAdminPassword(adminPassword)) return false;
+    try {
+      const updatedDevices = await CloudVaultService.removeDevice(targetDeviceId);
+      setConnectedDevices(updatedDevices);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   // Modal keyboard dismiss
   useEffect(() => {
@@ -1042,92 +963,10 @@ export default function App() {
     setIsEditingThought(false);
   }, [selectedThought, categories]);
 
-  // Universal Login Handler: Supports In-App GIS Popup (direct, zero-config) & Browser Flow
-  const handleLogin = async (options = {}) => {
-    const useBrowser = Boolean(options && options.browser);
-
-    // 1. In-App GIS Popup (Primary)
-    // Works seamlessly on Web and inside the APK with sanitized User-Agent and popup dialog in MainActivity.
-    // Does NOT send or require any redirect_uri, eliminating Error 400: redirect_uri_mismatch!
-    if (!useBrowser) {
-      if (tokenClientRef.current) {
-        try {
-          tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
-          return;
-        } catch (err) {
-          console.warn('In-app tokenClient request failed, trying fallback:', err);
-        }
-      } else if (window.google?.accounts?.oauth2) {
-        try {
-          const client = window.google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file',
-            callback: async (response) => {
-              if (response.error) {
-                setStatus('Auth Error');
-                return;
-              }
-              localStorage.setItem('gdrive_token', response.access_token);
-              setToken(response.access_token);
-              if (response.expires_in) {
-                const expiresAt = Date.now() + Number(response.expires_in) * 1000;
-                localStorage.setItem('gdrive_token_expires_at', String(expiresAt));
-                setTokenExpiry(expiresAt);
-              }
-              setStatus('Connected');
-            },
-          });
-          tokenClientRef.current = client;
-          client.requestAccessToken({ prompt: 'consent' });
-          return;
-        } catch (err) {
-          console.warn('Direct token client initialization failed:', err);
-        }
-      }
-    }
-
-    // 2. Browser / Chrome Custom Tab flow (Secondary / Fallback)
-    // Note: Requires https://kaiserabbas.github.io/thought-organizer/ to be registered in Google Cloud Console
-    if (Capacitor.isNativePlatform() || useBrowser) {
-      const redirectUri = 'https://kaiserabbas.github.io/thought-organizer/';
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&response_type=token&scope=${encodeURIComponent('https://www.googleapis.com/auth/drive.file')}&prompt=consent`;
-
-      try {
-        await Browser.open({ url: authUrl });
-      } catch (browserErr) {
-        console.error('Browser open failed:', browserErr);
-      }
-    }
-  };
-
-  const handleManualToken = (inputToken) => {
-    if (!inputToken || !inputToken.trim()) return false;
-    const cleanToken = inputToken.trim();
-    localStorage.setItem('gdrive_token', cleanToken);
-    const expiresAt = Date.now() + 3600 * 1000;
-    localStorage.setItem('gdrive_token_expires_at', String(expiresAt));
-    setToken(cleanToken);
-    setTokenExpiry(expiresAt);
-    setStatus('Connected');
-    return true;
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('gdrive_token');
-    localStorage.removeItem('gdrive_token_expires_at');
-    setToken(null);
-    setTokenExpiry(null);
-    syncedTokenRef.current = null;
-    setStatus('Ready');
-  };
-
   const handleRefreshMemory = async () => {
-    if (token) {
+    if (deviceConnected) {
       setStatus('Refreshing...');
-      await syncWithDrive(thoughts, categories, { forcePull: true });
-      setStatus('Refreshed');
+      await performSync(thoughts, categories, { forcePull: true });
     } else {
       try {
         const savedThoughts = JSON.parse(localStorage.getItem('cached_thoughts') || '[]');
@@ -1176,7 +1015,7 @@ export default function App() {
         setThoughts(mergedT);
         setCategories(mergedC);
         setStatus('Backup Restored');
-        if (token) {
+        if (deviceConnected) {
           await syncWithDrive(mergedT, mergedC, { directPush: true });
         }
       } catch {
@@ -1265,7 +1104,7 @@ export default function App() {
     setStatus('Saved Locally');
     showPasteToast(`✓ فکر "${nextThought.subject}" کامیابی سے شامل کر لیا گیا! (Thought added successfully)`);
 
-    if (token) {
+    if (deviceConnected) {
       await syncWithDrive(updatedThoughts, categories, { directPush: true });
     }
   };
@@ -1281,7 +1120,7 @@ export default function App() {
     setStatus('Category added');
     showPasteToast(`✓ زمرہ "${trimmed}" شامل کر لیا گیا (Category added)`);
 
-    if (token) {
+    if (deviceConnected) {
       await syncWithDrive(thoughts, nextCategories, { directPush: true });
     }
   };
@@ -1317,7 +1156,7 @@ export default function App() {
     setStatus('Category removed');
     showPasteToast(`زمرہ "${categoryName}" حذف کر دیا گیا (Category deleted)`);
 
-    if (token) {
+    if (deviceConnected) {
       await syncWithDrive(updatedThoughts, fallbackCategories, { directPush: true });
     }
   };
@@ -1333,7 +1172,7 @@ export default function App() {
     );
     setStatus('Saved Locally');
 
-    if (token) {
+    if (deviceConnected) {
       await syncWithDrive(updatedThoughts, categories, { directPush: true });
     }
   };
@@ -1370,7 +1209,7 @@ export default function App() {
     setStatus('Thought removed');
     showPasteToast(`فکر ${subject ? `"${subject}"` : ''} کامیابی سے حذف کر دیا گیا (Thought deleted)`);
 
-    if (token) {
+    if (deviceConnected) {
       await syncWithDrive(updatedThoughts, categories, { deletedIds: nextDeletedIds, directPush: true });
     }
   };
@@ -1414,7 +1253,7 @@ export default function App() {
     showPasteToast(`✓ فکر "${updatedThought.subject}" میں تبدیلیاں محفوظ ہو گئیں! (Changes saved)`);
     navigateTo(`thought/${updatedThought.id}`, true);
 
-    if (token) {
+    if (deviceConnected) {
       await syncWithDrive(updatedThoughts, categories, { directPush: true });
     }
   };
@@ -2847,15 +2686,17 @@ export default function App() {
             thoughts={thoughts}
             onAddCategory={handleAddCategory}
             onRequestDeleteCategory={requestDeleteCategory}
-            token={token}
             status={status}
             isSyncing={isSyncing}
             handleRefreshMemory={handleRefreshMemory}
-            handleLogin={handleLogin}
-            handleLogout={handleLogout}
             onExportBackup={handleExportBackup}
             onImportBackup={handleImportBackup}
-            onManualToken={handleManualToken}
+            deviceConnected={deviceConnected}
+            onConnectDevice={handleConnectDevice}
+            onDisconnectDevice={handleDisconnectDevice}
+            connectedDevices={connectedDevices}
+            onRemoveDevice={handleRemoveDevice}
+            onManualSync={handleRefreshMemory}
             ttsRate={ttsRate}
             setTtsRate={setTtsRate}
             ttsPitch={ttsPitch}

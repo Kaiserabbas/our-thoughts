@@ -8,7 +8,6 @@ import {
   Eye,
   EyeOff,
   Heart,
-  HelpCircle,
   Key,
   Loader2,
   LogOut,
@@ -62,15 +61,17 @@ export default function SettingsView({
   thoughts,
   onAddCategory,
   onRequestDeleteCategory,
-  token,
   status,
   isSyncing,
   handleRefreshMemory,
-  handleLogin,
-  handleLogout,
   onExportBackup,
   onImportBackup,
-  onManualToken,
+  deviceConnected = false,
+  onConnectDevice,
+  onDisconnectDevice,
+  connectedDevices = [],
+  onRemoveDevice,
+  onManualSync,
   ttsRate = 0.85,
   setTtsRate,
   ttsPitch = 0.68,
@@ -83,13 +84,18 @@ export default function SettingsView({
 }) {
   const [activeTab, setActiveTab] = useState('all');
 
+  // Device pairing state
+  const [connectPasswordInput, setConnectPasswordInput] = useState('');
+  const [connectError, setConnectError] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminVerified, setAdminVerified] = useState(false);
+  const [removingDeviceId, setRemovingDeviceId] = useState(null);
+
   // Categories & Backup
   const [newCatInput, setNewCatInput] = useState('');
   const [catError, setCatError] = useState('');
-  const [showOAuthHelp, setShowOAuthHelp] = useState(false);
-  const [showManualToken, setShowManualToken] = useState(false);
-  const [manualTokenInput, setManualTokenInput] = useState('');
-  const [showManualTokenSecret, setShowManualTokenSecret] = useState(false);
   const fileInputRef = useRef(null);
 
   // Groq Whisper AI
@@ -1238,153 +1244,211 @@ export default function SettingsView({
           </section>
         )}
 
-        {/* ── Google Drive & Memory Sync ── */}
+        {/* ── Device Pairing & Cross-Device Sync ── */}
         {showCloud && (
-          <section className="settings-card">
-            <div className="card-section-heading">
-              <div className="settings-icon-badge">
-                <CloudLightning size={22} />
+          <section className="settings-card device-pairing-card glass-control-panel">
+            <div className="device-panel-header">
+              <div className="device-panel-icon">
+                <CloudLightning size={24} />
               </div>
               <div>
-                <h3>Cloud & Google Drive Backup</h3>
-                <p className="card-subtitle">Sync thoughts to Google Drive and refresh memory state</p>
+                <h3>Cross-Device Sync</h3>
+                <p className="card-subtitle">Connect all your devices to the same encrypted vault</p>
               </div>
+              <span className={`device-connection-badge ${deviceConnected ? 'connected' : 'disconnected'}`}>
+                <span className="badge-dot" />
+                {deviceConnected ? 'Connected' : 'Not Connected'}
+              </span>
             </div>
 
+            {deviceConnected ? (
+              <div className="device-connected-body">
+                {/* Stats row */}
+                <div className="vault-stats-row">
+                  <div className="vault-stat-chip"><Database size={13} />{thoughts.length} thoughts</div>
+                  <div className="vault-stat-chip"><Heart size={13} />{totalFavorites} favorites</div>
+                  <div className="vault-stat-chip"><Tag size={13} />{categories.length} categories</div>
+                </div>
+
+                {/* Sync now */}
+                <div className="device-actions-row">
+                  <button
+                    type="button"
+                    className="glass-btn glass-btn-primary"
+                    onClick={() => onManualSync && onManualSync()}
+                    disabled={isSyncing}
+                  >
+                    <RotateCw size={15} className={isSyncing ? 'spin' : ''} />
+                    {isSyncing ? 'Syncing…' : 'Sync Now'}
+                  </button>
+                  <button
+                    type="button"
+                    className="glass-btn glass-btn-danger"
+                    onClick={() => onDisconnectDevice && onDisconnectDevice()}
+                  >
+                    <LogOut size={15} /> Disconnect
+                  </button>
+                </div>
+
+                {/* Connected devices */}
+                {connectedDevices.length > 0 && (
+                  <div className="devices-list-panel">
+                    <h4 className="devices-list-title">
+                      <Sparkles size={14} /> Connected Devices ({connectedDevices.length})
+                    </h4>
+                    {connectedDevices.map((d) => (
+                      <div key={d.id} className="device-row">
+                        <div className="device-row-info">
+                          <span className="device-row-name">{d.name}</span>
+                          <span className="device-row-time">
+                            Last seen: {d.lastSeen ? new Date(d.lastSeen).toLocaleString() : '—'}
+                          </span>
+                        </div>
+                        {adminVerified && (
+                          <button
+                            type="button"
+                            className="glass-btn glass-btn-xs glass-btn-danger"
+                            disabled={removingDeviceId === d.id}
+                            onClick={async () => {
+                              setRemovingDeviceId(d.id);
+                              await onRemoveDevice(d.id, adminPasswordInput);
+                              setRemovingDeviceId(null);
+                            }}
+                          >
+                            <Trash2 size={12} /> {removingDeviceId === d.id ? 'Removing…' : 'Remove'}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Admin panel */}
+                <div className="admin-panel-toggle-row">
+                  <button
+                    type="button"
+                    className="glass-btn glass-btn-ghost"
+                    onClick={() => { setShowAdminPanel((v) => !v); setAdminVerified(false); setAdminPasswordInput(''); }}
+                  >
+                    <Key size={14} /> {showAdminPanel ? 'Close Admin' : 'Admin Access'}
+                  </button>
+                </div>
+
+                {showAdminPanel && (
+                  <div className="admin-glass-panel">
+                    <p className="admin-panel-label">Enter admin password to manage devices:</p>
+                    {!adminVerified ? (
+                      <div className="admin-auth-row">
+                        <input
+                          type="password"
+                          className="glass-input"
+                          placeholder="Admin password"
+                          value={adminPasswordInput}
+                          onChange={(e) => setAdminPasswordInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const ok = adminPasswordInput === 'DeleteThought';
+                              setAdminVerified(ok);
+                              if (!ok) setAdminPasswordInput('');
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="glass-btn glass-btn-primary"
+                          onClick={() => {
+                            const ok = adminPasswordInput === 'DeleteThought';
+                            setAdminVerified(ok);
+                            if (!ok) setAdminPasswordInput('');
+                          }}
+                        >
+                          <Check size={14} /> Verify
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="admin-verified-msg">✓ Admin verified — use Remove buttons above to manage devices.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="device-connect-body">
+                <p className="connect-lead">
+                  All your devices share one encrypted vault. Enter the connection password to pair this device.
+                </p>
+                <div className="connect-form">
+                  <input
+                    type="password"
+                    className="glass-input"
+                    placeholder="Connection password"
+                    value={connectPasswordInput}
+                    onChange={(e) => { setConnectPasswordInput(e.target.value); setConnectError(''); }}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter' && connectPasswordInput.trim()) {
+                        setIsConnecting(true);
+                        const result = await onConnectDevice(connectPasswordInput.trim());
+                        setIsConnecting(false);
+                        if (!result?.success) setConnectError(result?.error || 'Connection failed.');
+                        else setConnectPasswordInput('');
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="glass-btn glass-btn-primary"
+                    disabled={!connectPasswordInput.trim() || isConnecting}
+                    onClick={async () => {
+                      setIsConnecting(true);
+                      const result = await onConnectDevice(connectPasswordInput.trim());
+                      setIsConnecting(false);
+                      if (!result?.success) setConnectError(result?.error || 'Connection failed.');
+                      else setConnectPasswordInput('');
+                    }}
+                  >
+                    <CloudLightning size={15} />
+                    {isConnecting ? 'Connecting…' : 'Connect Device'}
+                  </button>
+                </div>
+                {connectError && <p className="connect-error">{connectError}</p>}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── Status & Refresh ── */}
+        {showCloud && (
+          <section className="settings-card glass-control-panel">
+            <div className="card-section-heading">
+              <div className="settings-icon-badge">
+                <RotateCw size={22} />
+              </div>
+              <div>
+                <h3>Sync Status</h3>
+                <p className="card-subtitle">Current synchronization status</p>
+              </div>
+            </div>
             <div className="sync-status-row">
-              <span className="status-label">Current Status:</span>
+              <span className="status-label">Status:</span>
               <span className="status-pill">
                 {isSyncing && <RotateCw size={13} className="spin" />}
                 {status}
               </span>
             </div>
-
-            <div className="sync-actions-row">
+            <div className="sync-actions-row" style={{ marginTop: '12px' }}>
               <button
                 type="button"
-                className="primary-button refresh-button"
+                className="glass-btn glass-btn-primary"
                 onClick={handleRefreshMemory}
                 disabled={isSyncing}
               >
-                <RotateCw size={16} className={isSyncing ? 'spin' : ''} />
+                <RotateCw size={15} className={isSyncing ? 'spin' : ''} />
                 Refresh Memory
               </button>
-
-              {token ? (
-                <button type="button" className="secondary-button" onClick={handleLogout}>
-                  <LogOut size={16} /> Disconnect Drive
-                </button>
-              ) : (
-                <>
-                  <button type="button" className="secondary-button" onClick={() => handleLogin()}>
-                    Connect Google Drive
-                  </button>
-                  <button
-                    type="button"
-                    className="action-link"
-                    onClick={() => setShowManualToken(!showManualToken)}
-                    title="Manual Access Token paste"
-                  >
-                    <Key size={15} /> Paste Token
-                  </button>
-                </>
-              )}
-
-              <button
-                type="button"
-                className="action-link"
-                onClick={() => setShowOAuthHelp(!showOAuthHelp)}
-                title="Google OAuth 2.0 configuration details"
-              >
-                <HelpCircle size={15} /> APK OAuth Info
-              </button>
             </div>
-
-            {showManualToken && !token && (
-              <div className="oauth-help-box" style={{ marginTop: '0.75rem' }}>
-                <h4>Manual OAuth Access Token</h4>
-                <p style={{ fontSize: '0.82rem', marginBottom: '0.5rem' }}>
-                  If you have an OAuth 2.0 token (from OAuth Playground or gcloud), paste it directly below:
-                </p>
-                <div className="api-key-input-wrapper">
-                  <input
-                    type={showManualTokenSecret ? 'text' : 'password'}
-                    placeholder="ya29.a0..."
-                    value={manualTokenInput}
-                    onChange={(e) => setManualTokenInput(e.target.value)}
-                    className="api-key-input"
-                  />
-                  <div className="api-key-inline-actions">
-                    <button
-                      type="button"
-                      className="key-action-icon-btn"
-                      onClick={() => setShowManualTokenSecret((v) => !v)}
-                      title={showManualTokenSecret ? 'Hide token' : 'Show token'}
-                    >
-                      {showManualTokenSecret ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                    <button
-                      type="button"
-                      className="key-action-icon-btn"
-                      onClick={async () => {
-                        const text = await navigator.clipboard?.readText();
-                        if (text) setManualTokenInput(text.trim());
-                      }}
-                      title="Paste from clipboard"
-                    >
-                      <ClipboardPaste size={15} />
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '8px' }}>
-                  <button
-                    type="button"
-                    className="primary-button"
-                    style={{ padding: '0.5rem 1rem' }}
-                    onClick={() => {
-                      if (onManualToken && onManualToken(manualTokenInput)) {
-                        setShowManualToken(false);
-                        setManualTokenInput('');
-                      }
-                    }}
-                  >
-                    Apply Token
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {showOAuthHelp && (
-              <div className="oauth-help-box">
-                <h4>Google OAuth 2.0 Setup Details</h4>
-                <p>
-                  <strong>1. In-App Direct Login (Default):</strong><br />
-                  Tapping <em>&quot;Connect Google Drive&quot;</em> opens the Google Sign-in dialog directly inside the app with a sanitized User-Agent. It uses in-app messaging and does <strong>not</strong> require redirect URIs.
-                </p>
-                <p style={{ marginTop: '0.5rem' }}>
-                  <strong>2. If using External Browser / Chrome Custom Tab:</strong><br />
-                  If you encounter <code>Error 400: redirect_uri_mismatch</code>, go to{' '}
-                  <em>Google Cloud Console &gt; APIs &amp; Services &gt; Credentials</em>, select your Web Client ID, and add this exact URI to <strong>Authorized redirect URIs</strong>:
-                  <br />
-                  <code>https://kaiserabbas.github.io/thought-organizer/</code>
-                </p>
-              </div>
-            )}
-
-            <div className="sync-stats-box">
-              <div className="sync-stat">
-                <Database size={15} />
-                <span>{thoughts.length} total saved</span>
-              </div>
-              <div className="sync-stat">
-                <Heart size={15} />
-                <span>{totalFavorites} favorites backed up</span>
-              </div>
-              <div className="sync-stat">
-                <Tag size={15} />
-                <span>{categories.length} categories</span>
-              </div>
+            <div className="vault-stats-row" style={{ marginTop: '14px' }}>
+              <div className="vault-stat-chip"><Database size={13} />{thoughts.length} thoughts</div>
+              <div className="vault-stat-chip"><Heart size={13} />{totalFavorites} favorites</div>
+              <div className="vault-stat-chip"><Tag size={13} />{categories.length} categories</div>
             </div>
           </section>
         )}
