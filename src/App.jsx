@@ -503,6 +503,11 @@ export default function App() {
     else navigateTo(view);
   }, [navigateTo]);
 
+  const handleGoHome = useCallback(() => {
+    closeSelectedThought();
+    handleSwitchView('home');
+  }, [closeSelectedThought, handleSwitchView]);
+
   const addSubjectFieldRef = useRef(null);
   const addSubjectInputRef = useRef(null);
 
@@ -656,6 +661,38 @@ export default function App() {
       }
     } catch {
       // Ignore if native API unavailable
+    }
+  }, []);
+
+  // Suppress and remove injected Netlify HUD/Drawer feedback elements
+  useEffect(() => {
+    const selectors = [
+      'netlify-drawer',
+      '#netlify-drawer',
+      '.netlify-badge',
+      '[data-netlify-drawer]',
+      'iframe[src*="netlify"]',
+      'iframe[id*="netlify"]',
+      'div[id*="netlify-drawer"]',
+      'div[class*="netlify-drawer"]'
+    ];
+    const removeWidgets = () => {
+      selectors.forEach((sel) => {
+        document.querySelectorAll(sel).forEach((el) => {
+          try {
+            el.remove();
+          } catch {
+            el.style.display = 'none';
+            el.style.pointerEvents = 'none';
+          }
+        });
+      });
+    };
+    removeWidgets();
+    if (typeof MutationObserver !== 'undefined') {
+      const observer = new MutationObserver(removeWidgets);
+      observer.observe(document.body, { childList: true, subtree: true });
+      return () => observer.disconnect();
     }
   }, []);
 
@@ -1344,7 +1381,19 @@ export default function App() {
     <div className="app-shell" data-theme={theme}>
       {/* ── Top Bar ── */}
       <header className="topbar">
-        <div className="brand-block">
+        <div
+          className="brand-block brand-block-clickable"
+          onClick={handleGoHome}
+          title="صفحۂ اول / تمام افکار (Go to Home)"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleGoHome();
+            }
+          }}
+        >
           <div className="brand-icon">
             <img src="/logo.png" alt="Brain icon" width={120} height={120} />
           </div>
@@ -2845,9 +2894,10 @@ export default function App() {
       <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
         <button
           type="button"
-          className={`mobile-nav-item ${activeView === 'home' ? 'active' : ''}`}
-          onClick={() => handleSwitchView('home')}
+          className={`mobile-nav-item ${activeView === 'home' && !selectedThought ? 'active' : ''}`}
+          onClick={handleGoHome}
           aria-label="Home"
+          title="تمام افکار (Home)"
         >
           <BookOpen size={19} />
           <span>تمام افکار</span>

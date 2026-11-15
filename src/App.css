@@ -138,6 +138,20 @@ button {
   gap: 24px;
 }
 
+.brand-block-clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.brand-block-clickable:hover {
+  opacity: 0.88;
+}
+
+.brand-block-clickable:active {
+  transform: scale(0.98);
+}
+
 .brand-icon {
   width: 72px;
   height: 72px;
@@ -4465,7 +4479,7 @@ h1 {
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    z-index: 90 !important;
+    z-index: 2147483647 !important;
     background: var(--bg-surface) !important;
     border-top: 1px solid var(--border-color) !important;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
@@ -7517,6 +7531,7 @@ h1 {
   }
 
   .mobile-bottom-nav {
+    z-index: 2147483647 !important;
     bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
     left: 10px !important;
     right: 10px !important;
@@ -8032,4 +8047,25 @@ h1 {
 
 [data-theme='dark'] .admin-verified-msg {
   color: #4ade80;
+}
+
+/* ── Netlify Drawer / Feedback / Badge Suppression ── */
+netlify-drawer,
+#netlify-drawer,
+.netlify-badge,
+[data-netlify-drawer],
+iframe[src*="netlify"],
+iframe[id*="netlify"],
+div[id*="netlify-drawer"],
+div[class*="netlify-drawer"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  z-index: -1 !important;
 }
