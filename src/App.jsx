@@ -1,4 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import { CloudVaultService } from './cloudVaultService';
 import CollectionsView from './CollectionsView';
 import SimilarThoughtsView from './SimilarThoughtsView';
@@ -638,18 +640,22 @@ export default function App() {
 
   // Capacitor Android hardware back button integration
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      const subPromise = CapApp.addListener('backButton', () => {
-        const clean = window.location.hash.replace(/^#\/?/, '').trim();
-        if (clean && clean !== '/') {
-          window.history.back();
-        } else {
-          CapApp.exitApp();
-        }
-      });
-      return () => {
-        subPromise.then((sub) => sub.remove());
-      };
+    try {
+      if (typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+        const subPromise = CapApp.addListener('backButton', () => {
+          const clean = window.location.hash.replace(/^#\/?/, '').trim();
+          if (clean && clean !== '/') {
+            window.history.back();
+          } else {
+            CapApp.exitApp();
+          }
+        });
+        return () => {
+          subPromise.then((sub) => sub?.remove?.());
+        };
+      }
+    } catch {
+      // Ignore if native API unavailable
     }
   }, []);
 
