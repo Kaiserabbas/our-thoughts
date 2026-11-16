@@ -7,6 +7,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Copy,
   Download,
   Heart,
@@ -85,6 +86,8 @@ export default function CollectionsView({
   setCollectionSelectedCategory,
   collectionFavoritesOnly,
   setCollectionFavoritesOnly,
+  collectionRecentOnly = false,
+  setCollectionRecentOnly,
   formatDate,
   summarizeText,
   setSelectedThought,
@@ -163,24 +166,51 @@ export default function CollectionsView({
     setExportingId(null);
   };
 
+  // Sort mode for the collection view
+  const [sortBy, setSortBy] = useState('newest');
+
+  const getThoughtTime = (thought) => {
+    const raw = thought?.createdAt || thought?.timestamp;
+    if (raw) return Number(raw) || 0;
+    if (thought?.entryDate) {
+      const parsed = Date.parse(thought.entryDate);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    return 0;
+  };
+
+  const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+  const nowTs = Date.now();
+
   // Robust multi-word search with diacritic-tolerant matching across subject, body, category, and author
-  const baseFiltered = [...thoughts]
-    .sort((left, right) => Number(right.createdAt || right.timestamp || 0) - Number(left.createdAt || left.timestamp || 0))
-    .filter((thought) => {
-      const haystack = normalizeUrduText(
-        `${thought.subject || ''} ${thought.description || ''} ${thought.category || ''} ${thought.author || ''}`
-      );
-      const matchesQuery =
-        normalizedWords.length === 0 ||
-        normalizedWords.every((word) => haystack.includes(word));
-      const matchesFavorite = !collectionFavoritesOnly || thought.favorite;
-      return matchesQuery && matchesFavorite;
-    });
+  const filteredThoughts = [...thoughts].filter((thought) => {
+    const haystack = normalizeUrduText(
+      `${thought.subject || ''} ${thought.description || ''} ${thought.category || ''} ${thought.author || ''}`
+    );
+    const matchesQuery =
+      normalizedWords.length === 0 ||
+      normalizedWords.every((word) => haystack.includes(word));
+    const matchesFavorite = !collectionFavoritesOnly || thought.favorite;
+    const matchesRecent =
+      !collectionRecentOnly || nowTs - getThoughtTime(thought) <= RECENT_WINDOW_MS;
+    return matchesQuery && matchesFavorite && matchesRecent;
+  });
 
   // Apply category filter
-  const visibleThoughts = collectionSelectedCategory === 'All'
-    ? baseFiltered
-    : baseFiltered.filter((thought) => thought.category === collectionSelectedCategory);
+  const visibleThoughts = (collectionSelectedCategory === 'All'
+    ? filteredThoughts
+    : filteredThoughts.filter((thought) => thought.category === collectionSelectedCategory)
+  ).sort((left, right) => {
+    if (sortBy === 'oldest') return getThoughtTime(left) - getThoughtTime(right);
+    if (sortBy === 'title')
+      return String(left.subject || '').localeCompare(String(right.subject || ''), undefined, { sensitivity: 'base' });
+    return getThoughtTime(right) - getThoughtTime(left);
+  });
+
+  // baseFiltered kept for counts/back-compat (newest first)
+  const baseFiltered = [...filteredThoughts].sort(
+    (left, right) => getThoughtTime(right) - getThoughtTime(left)
+  );
 
   // Count thoughts per category
   const categoryCounts = {};
@@ -188,6 +218,7 @@ export default function CollectionsView({
     categoryCounts[cat] = baseFiltered.filter((t) => t.category === cat).length;
   }
   const favoritesCount = baseFiltered.filter((t) => t.favorite).length;
+  const recentCount = thoughts.filter((t) => nowTs - getThoughtTime(t) <= RECENT_WINDOW_MS).length;
 
   // Group by category for "All" view
   const groupedCollections = categories
@@ -396,9 +427,9 @@ export default function CollectionsView({
           <button
             type="button"
             role="tab"
-            aria-selected={collectionSelectedCategory === 'All' && !collectionFavoritesOnly}
-            className={`category-tab ${collectionSelectedCategory === 'All' && !collectionFavoritesOnly ? 'active' : ''}`}
-            onClick={() => { setCollectionSelectedCategory('All'); setCollectionFavoritesOnly(false); }}
+            aria-selected={collectionSelectedCategory === 'All' && !collectionFavoritesOnly && !collectionRecentOnly}
+            className={`category-tab ${collectionSelectedCategory === 'All' && !collectionFavoritesOnly && !collectionRecentOnly ? 'active' : ''}`}
+            onClick={() => { setCollectionSelectedCategory('All'); setCollectionFavoritesOnly(false); setCollectionRecentOnly(false); }}
           >
             <BookOpen size={14} />
             تمام افکار
@@ -410,9 +441,9 @@ export default function CollectionsView({
               key={category}
               type="button"
               role="tab"
-              aria-selected={collectionSelectedCategory === category && !collectionFavoritesOnly}
-              className={`category-tab ${collectionSelectedCategory === category && !collectionFavoritesOnly ? 'active' : ''}`}
-              onClick={() => { setCollectionSelectedCategory(category); setCollectionFavoritesOnly(false); }}
+              aria-selected={collectionSelectedCategory === category && !collectionFavoritesOnly && !collectionRecentOnly}
+              className={`category-tab ${collectionSelectedCategory === category && !collectionFavoritesOnly && !collectionRecentOnly ? 'active' : ''}`}
+              onClick={() => { setCollectionSelectedCategory(category); setCollectionFavoritesOnly(false); setCollectionRecentOnly(false); }}
             >
               <Tag size={13} />
               {category}
@@ -425,12 +456,24 @@ export default function CollectionsView({
             role="tab"
             aria-selected={collectionFavoritesOnly}
             className={`category-tab tab-favorites ${collectionFavoritesOnly ? 'active' : ''}`}
-            onClick={() => { setCollectionFavoritesOnly(true); setCollectionSelectedCategory('All'); }}
+            onClick={() => { setCollectionFavoritesOnly(true); setCollectionSelectedCategory('All'); setCollectionRecentOnly(false); }}
           >
             <Star size={13} />
             پسندیدہ
             <span className="tab-count">{favoritesCount}</span>
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={collectionRecentOnly}
+            className={`category-tab tab-recent ${collectionRecentOnly ? 'active' : ''}`}
+            onClick={() => { setCollectionRecentOnly(true); setCollectionFavoritesOnly(false); setCollectionSelectedCategory('All'); }}
+          >
+            <Clock size={13} />
+            Recent
+            <span className="tab-count">{recentCount}</span>
+          </button>
+
         </div>
 
         <button
@@ -500,6 +543,21 @@ export default function CollectionsView({
             ))}
           </div>
         </div>
+      {/* Sort options */}
+      <div className="collection-sort-row">
+        <label className="collection-sort-label" htmlFor="collection-sort">Sort:</label>
+        <select
+          id="collection-sort"
+          className="collection-sort-select"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="title">Title A–Z</option>
+        </select>
+      </div>
+
       </div>
 
       {/* ── Content ── */}
@@ -584,12 +642,12 @@ export default function CollectionsView({
             {visibleThoughts.map((thought) => renderThoughtCard(thought))}
           </div>
         </section>
-      ) : collectionSelectedCategory !== 'All' || collectionFavoritesOnly ? (
+      ) : collectionSelectedCategory !== 'All' || collectionFavoritesOnly || collectionRecentOnly ? (
         /* ── Single category or favorites: flat grid, ALL thoughts ── */
         <section className="single-category-view">
           <div className="section-title-row">
             <h2>
-              {collectionFavoritesOnly ? '★ Favorites' : collectionSelectedCategory}
+              {collectionRecentOnly ? '🕐 Recent Thoughts' : collectionFavoritesOnly ? '★ Favorites' : collectionSelectedCategory}
             </h2>
             <span>{visibleThoughts.length} {visibleThoughts.length === 1 ? 'thought' : 'thoughts'}</span>
           </div>

@@ -363,7 +363,7 @@ export default function SettingsView({
   const showAppearance = showAll || activeTab === 'appearance';
 
   return (
-    <div className="settings-page">
+    <div className="settings-page glass-settings-board">
       <div className="settings-header">
         <p className="eyebrow">Preferences & Management</p>
         <h2>Settings</h2>

@@ -365,6 +365,7 @@ export default function App() {
   const [collectionSearchQuery, setCollectionSearchQuery] = useState('');
   const [collectionSelectedCategory, setCollectionSelectedCategory] = useState('All');
   const [collectionFavoritesOnly, setCollectionFavoritesOnly] = useState(false);
+  const [collectionRecentOnly, setCollectionRecentOnly] = useState(false);
   const [activeView, setActiveView] = useState('home');
   const [status, setStatus] = useState(() => {
     if (typeof window !== 'undefined' && CloudVaultService.isConnected()) {
@@ -2148,6 +2149,8 @@ export default function App() {
             setCollectionSelectedCategory={setCollectionSelectedCategory}
             collectionFavoritesOnly={collectionFavoritesOnly}
             setCollectionFavoritesOnly={setCollectionFavoritesOnly}
+            collectionRecentOnly={collectionRecentOnly}
+            setCollectionRecentOnly={setCollectionRecentOnly}
             formatDate={formatDate}
             summarizeText={summarizeText}
             setSelectedThought={handleSelectThought}
