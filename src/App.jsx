@@ -704,13 +704,16 @@ export default function App() {
 
   const handleStartEditThought = useCallback(() => {
     if (selectedThought) {
+      setEditFormData(makeEditForm(selectedThought, categories));
+      setIsEditingThought(true);
       navigateTo(`thought/${selectedThought.id}/edit`);
     }
-  }, [selectedThought, navigateTo]);
+  }, [selectedThought, categories, navigateTo]);
 
   const handleCancelEditThought = useCallback(() => {
     if (selectedThought) {
       setEditFormData(makeEditForm(selectedThought, categories));
+      setIsEditingThought(false);
       navigateTo(`thought/${selectedThought.id}`);
     }
   }, [selectedThought, categories, navigateTo]);
@@ -848,7 +851,19 @@ export default function App() {
       if (route.view === 'thought' && route.thoughtId) {
         const found = thoughts.find((t) => String(t.id) === String(route.thoughtId));
         if (found) {
-          setSelectedThought(found);
+          setSelectedThought((prev) => {
+            if (prev && String(prev.id) === String(found.id)) {
+              if (route.isEdit) return prev;
+              if (
+                prev.updatedAt === found.updatedAt &&
+                prev.description === found.description &&
+                prev.subject === found.subject
+              ) {
+                return prev;
+              }
+            }
+            return found;
+          });
           setIsEditingThought(route.isEdit);
         } else {
           setSelectedThought(null);
@@ -1234,15 +1249,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedThought, closeSelectedThought]);
 
+  const prevSelectedThoughtIdRef = useRef(null);
+
   useEffect(() => {
     if (!selectedThought) {
+      prevSelectedThoughtIdRef.current = null;
       setIsEditingThought(false);
       setCopiedThought(false);
       return;
     }
 
-    setEditFormData(makeEditForm(selectedThought, categories));
-    setIsEditingThought(false);
+    // Only re-initialize edit form when opening a DIFFERENT thought
+    if (prevSelectedThoughtIdRef.current !== selectedThought.id) {
+      prevSelectedThoughtIdRef.current = selectedThought.id;
+      setEditFormData(makeEditForm(selectedThought, categories));
+      const route = parseHashRoute(typeof window !== 'undefined' ? window.location.hash : '');
+      if (!route.isEdit) {
+        setIsEditingThought(false);
+      }
+    }
   }, [selectedThought, categories]);
 
   const handleRefreshMemory = async () => {
