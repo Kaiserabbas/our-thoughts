@@ -1892,7 +1892,7 @@ export default function App() {
                     placeholder="Thought subject"
                     dir="auto"
                     style={{
-                      fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                      fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif",
                     }}
                   />
                 </div>
@@ -2370,7 +2370,7 @@ export default function App() {
                   className="reading-article-title"
                   dir="auto"
                   style={{
-                    fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                    fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif",
                   }}
                 >
                   {highlightSearchWords(selectedThought.subject || 'بلا عنوان فکر', inReadingSearchQuery)}
@@ -2740,7 +2740,7 @@ export default function App() {
                       placeholder="What sparked this thought?"
                       dir="auto"
                       style={{
-                        fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                        fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif",
                       }}
                     />
                   </div>

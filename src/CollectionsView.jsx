@@ -345,10 +345,10 @@ export default function CollectionsView({
           </div>
         </div>
 
-        {/* Enhanced Heading with generous padding — Default font as requested */}
+        {/* Enhanced Heading with generous padding — Jameel Noori font */}
         <strong
           className="article-title"
-          style={{ fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }}
+          style={{ fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif" }}
         >
           {highlightMatches(thought.subject || 'Untitled thought', trimmedQuery)}
         </strong>

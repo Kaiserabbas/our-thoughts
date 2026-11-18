@@ -304,7 +304,7 @@ export default function SimilarThoughtsView({
                 </div>
                 <strong
                   className="article-title"
-                  style={{ fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }}
+                  style={{ fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif" }}
                 >
                   {thought.subject || 'بلا عنوان'}
                 </strong>
@@ -371,7 +371,7 @@ export default function SimilarThoughtsView({
             </div>
             <h4
               className="spotlight-title"
-              style={{ fontFamily: getFontFamilyCss(selectedSeed.fontFamily) }}
+              style={{ fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif" }}
             >
               {selectedSeed.subject || 'بلا عنوان'}
             </h4>
@@ -439,7 +439,7 @@ export default function SimilarThoughtsView({
 
                     <strong
                       className="similar-card-title"
-                      style={{ fontFamily: getFontFamilyCss(thought.fontFamily) }}
+                      style={{ fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif" }}
                     >
                       {thought.subject || 'بلا عنوان'}
                     </strong>

@@ -662,9 +662,9 @@ h1 {
 /* ── Card Heading with Enhanced Padding ── */
 .article-title {
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
-  font-size: 1.32rem;
-  line-height: 1.6;
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
+  font-size: 1.35rem;
+  line-height: 1.8;
   font-weight: 700;
   padding: 8px 0 4px;
   margin: 0;
@@ -6077,7 +6077,8 @@ h1 {
 }
 
 .similar-card-title {
-  font-size: 1.22rem;
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
+  font-size: 1.25rem;
   line-height: 1.8;
   font-weight: 700;
   color: var(--text-primary);
@@ -6294,9 +6295,9 @@ h1 {
 }
 
 .reading-article-title {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
   font-size: 2.35rem;
-  line-height: 1.5;
+  line-height: 1.8;
   font-weight: 800;
   color: var(--text-primary);
   margin: 0 0 20px 0;
@@ -7334,13 +7335,15 @@ h1 {
 }
 
 .article-title,
-.reading-article-title {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
+.similar-card-title,
+.reading-article-title,
+.spotlight-title {
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
 }
 
 .article-excerpt,
+.similar-card-excerpt,
 .strand-name,
-.spotlight-title,
 .spotlight-body,
 .reading-article-body {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
