@@ -8397,27 +8397,95 @@ div[class*="netlify-drawer"] {
 
 /* ─── Topbar: maablib dark emerald masthead ─── */
 .topbar {
-  background: #0B3D2E;
-  border-bottom: 2px solid var(--maab-gold);
-  color: #FFFFFF;
+  background: linear-gradient(135deg, #0B3D2E 0%, #0e4534 100%) !important;
+  border: 1px solid rgba(230, 185, 78, 0.35) !important;
+  border-bottom: 3px solid var(--maab-gold) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 20px rgba(11, 61, 46, 0.22);
 }
 
-/* Force child text/icon colors on dark topbar */
-.topbar .brand-title,
-.topbar .brand-subtitle,
+/* Brand icon container in header */
+.topbar .brand-icon {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(230, 185, 78, 0.4) !important;
+  border-radius: 14px;
+}
+
+/* App title and subtitle: clear, brilliant contrast */
+.topbar h1 {
+  color: #FFFFFF !important;
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
 .topbar .eyebrow {
-  color: #FFFFFF;
+  color: var(--maab-gold) !important;
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif !important;
+  font-size: 0.88rem !important;
+  letter-spacing: 0.02em;
 }
 
-.topbar .header-actions .icon-only-btn {
-  color: rgba(255,255,255,0.85);
-  border-color: rgba(255,255,255,0.2);
+/* Total thoughts count pill in header */
+.topbar .status-pill,
+.topbar .academic-status-pill {
+  background: rgba(208, 241, 233, 0.14) !important;
+  border: 1px solid rgba(230, 185, 78, 0.45) !important;
+  border-radius: 9999px !important;
+  color: #FFFFFF !important;
 }
 
-.topbar .header-actions .icon-only-btn:hover {
-  background: rgba(230,185,78,0.15);
-  color: var(--maab-gold);
-  border-color: var(--maab-gold);
+.topbar .academic-status-pill span {
+  color: #FFFFFF !important;
+}
+
+.topbar .academic-status-pill .pill-bold {
+  color: var(--maab-gold) !important;
+  font-weight: 700;
+}
+
+.topbar .academic-status-pill .status-icon,
+.topbar .academic-status-pill .status-icon.success {
+  color: var(--maab-gold) !important;
+  stroke: var(--maab-gold) !important;
+}
+
+/* Header action buttons (Theme toggle, Settings, Lock) */
+.topbar .action-button.icon-only-btn {
+  color: #FFFFFF !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(230, 185, 78, 0.35) !important;
+  border-radius: 50% !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 180ms ease;
+}
+
+.topbar .action-button.icon-only-btn svg {
+  color: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
+
+.topbar .action-button.icon-only-btn:hover:not(:disabled) {
+  background: rgba(230, 185, 78, 0.25) !important;
+  color: var(--maab-gold) !important;
+  border-color: var(--maab-gold) !important;
+  transform: translateY(-1px);
+}
+
+.topbar .action-button.icon-only-btn:hover:not(:disabled) svg {
+  color: var(--maab-gold) !important;
+  stroke: var(--maab-gold) !important;
+}
+
+/* Active action button (e.g. settings view active) */
+.topbar .action-button.icon-only-btn.active {
+  background: var(--maab-gold) !important;
+  color: #0B3D2E !important;
+  border-color: var(--maab-gold) !important;
+}
+
+.topbar .action-button.icon-only-btn.active svg {
+  color: #0B3D2E !important;
+  stroke: #0B3D2E !important;
 }
 
 /* ─── View tabs: underline-style ─── */
