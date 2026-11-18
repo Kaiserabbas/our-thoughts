@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Almarai:wght@400;700&family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Noto+Nastaliq+Urdu:wght@400;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Tajawal:wght@400;500;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Almarai:wght@400;700&family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Noto+Nastaliq+Urdu:wght@400;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Tajawal:wght@400;500;700&display=swap');
 
 @font-face {
   font-family: 'Jameel Noori Nastaleeq';
@@ -8317,139 +8317,110 @@ div[class*="netlify-drawer"] {
 
 
 
+
+
+
 /*
  * ═══════════════════════════════════════════════════════════════════
- *  MAABLIB-INSPIRED DESIGN ENHANCEMENTS
+ *  MAABLIB-INSPIRED DESIGN ENHANCEMENTS  (v2 — accurate live scrape)
+ *  Based on: https://maablib.org/  (#0D5C4A · #0B3D2E · #E6B94E)
  *  Scholarly Islamic Digital Library Aesthetic
- *  Parchment tones · Forest green accents · Ornamental dividers
- *  Editorial typography · Classical calligraphic presentation
+ *  Deep emerald · Antique gold · Mint badges · Nastaleeq type
  * ═══════════════════════════════════════════════════════════════════
  */
 
 /* ─── Extended CSS Variables ─── */
 :root {
-  /* Richer parchment palette */
-  --bg-app:          #f2ede4;
-  --bg-surface:      #faf7f0;
-  --bg-card:         #fdf9f2;
-  --bg-subtle:       #ede8df;
-  --bg-input:        #fdf9f2;
+  /* Palette from live maablib.org inspection */
+  --maab-green:        #0D5C4A;   /* primary green — headings, active states */
+  --maab-dark:         #0B3D2E;   /* dark frame — topbar, hero, footer */
+  --maab-gold:         #E6B94E;   /* accent gold — borders, underlines, bullets */
+  --maab-surface:      #F4F8F7;   /* off-white content surface */
+  --maab-mint:         #D0F1E9;   /* badge mint — count pills, filter active */
 
-  /* Deeper, warmer forest-green (maablib primary) */
-  --accent-color:    #1b4f3a;
-  --accent-hover:    #133829;
-  --accent-subtle:   #e8f2ec;
-  --accent-gold:     #b5882a;
+  /* Override app palette to match maablib */
+  --bg-app:            #F4F8F7;
+  --bg-surface:        #F4F8F7;
+  --bg-card:           #FFFFFF;
+  --bg-subtle:         #EEF2F1;
+  --bg-input:          #FFFFFF;
 
-  /* Primary button */
-  --primary-btn-bg:  #1b4f3a;
-  --primary-btn-hover: #133829;
+  --accent-color:      #0D5C4A;
+  --accent-hover:      #0A4A3B;
+  --accent-subtle:     #D0F1E9;
+  --accent-gold:       #E6B94E;
 
-  /* Ornamental gold border */
-  --border-color:    #cfc9bb;
-  --border-subtle:   #e0dbd0;
-  --border-focus:    #1b4f3a;
-  --border-gold:     #b5882a;
+  --primary-btn-bg:    #0D5C4A;
+  --primary-btn-hover: #0A4A3B;
 
-  /* Text shades */
-  --text-primary:    #1c2820;
-  --text-secondary:  #4a5a4f;
-  --text-muted:      #7a877e;
+  --border-color:      #E2E8F0;
+  --border-subtle:     #EEF2F1;
+  --border-focus:      #0D5C4A;
+  --border-gold:       #E6B94E;
 
-  /* Shadows — lighter, more bookish */
-  --card-shadow:      0 1px 4px rgba(26, 40, 28, 0.06), 0 6px 20px rgba(26, 40, 28, 0.04);
-  --card-shadow-hover:0 8px 28px rgba(26, 40, 28, 0.13), 0 2px 6px rgba(26, 40, 28, 0.06);
+  --text-primary:      #1A1A1A;
+  --text-secondary:    #2D3748;
+  --text-muted:        #64748B;
+
+  /* Teal glow shadow (maablib hover) */
+  --card-shadow:       0 4px 12px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 8px 24px rgba(13, 92, 74, 0.10);
 }
 
 [data-theme='dark'] {
-  --bg-app:          #0e1512;
-  --bg-surface:      #141c17;
-  --bg-card:         #18231c;
-  --bg-subtle:       #1e2920;
-  --bg-input:        #111a14;
-  --accent-color:    #7fcba8;
-  --accent-hover:    #9adcbb;
-  --accent-subtle:   #142419;
-  --accent-gold:     #d4a84b;
-  --border-color:    #2a3a2f;
-  --border-subtle:   #222e26;
-  --border-gold:     #7a6020;
-  --text-primary:    #e8ede8;
-  --text-secondary:  #b2bfb5;
-  --text-muted:      #7a8a7d;
-  --primary-btn-bg:  #7fcba8;
-  --primary-btn-text:#0a1a0e;
-  --primary-btn-hover:#9adcbb;
-  --card-shadow:      0 2px 8px rgba(0,0,0,0.42);
-  --card-shadow-hover:0 10px 28px rgba(0,0,0,0.5);
+  --bg-app:            #0a1510;
+  --bg-surface:        #0f1e17;
+  --bg-card:           #152018;
+  --bg-subtle:         #1a2a20;
+  --bg-input:          #0f1e17;
+  --accent-color:      #5ecba1;
+  --accent-hover:      #7ddbb5;
+  --accent-subtle:     #0d2a1f;
+  --accent-gold:       #E6B94E;
+  --border-color:      #243326;
+  --border-subtle:     #1c2a20;
+  --border-gold:       #9a7a28;
+  --text-primary:      #e8ede8;
+  --text-secondary:    #adbfb2;
+  --text-muted:        #6b7f72;
+  --primary-btn-bg:    #5ecba1;
+  --primary-btn-text:  #081208;
+  --primary-btn-hover: #7ddbb5;
+  --card-shadow:       0 2px 8px rgba(0,0,0,0.42);
+  --card-shadow-hover: 0 10px 28px rgba(0,0,0,0.5);
 }
 
-/* ─── App Shell: warmer background texture ─── */
+/* ─── App shell ─── */
 .app-shell {
-  background-image:
-    radial-gradient(ellipse at 100% 0%, rgba(181,136,42,0.045) 0%, transparent 55%),
-    radial-gradient(ellipse at 0% 100%, rgba(27,79,58,0.04) 0%, transparent 55%);
+  background: var(--bg-app);
 }
 
-/* ─── Topbar: Maablib editorial masthead style ─── */
+/* ─── Topbar: maablib dark emerald masthead ─── */
 .topbar {
-  border-bottom: none;
-  padding-bottom: 0;
-  position: relative;
+  background: #0B3D2E;
+  border-bottom: 2px solid var(--maab-gold);
+  color: #FFFFFF;
 }
 
-.topbar::before {
-  content: '';
-  display: block;
-  position: absolute;
-  bottom: -14px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    var(--border-gold) 15%,
-    var(--border-gold) 50%,
-    var(--border-gold) 85%,
-    transparent 100%
-  );
-  opacity: 0.6;
+/* Force child text/icon colors on dark topbar */
+.topbar .brand-title,
+.topbar .brand-subtitle,
+.topbar .eyebrow {
+  color: #FFFFFF;
 }
 
-.topbar::after {
-  content: '';
-  display: block;
-  position: absolute;
-  bottom: -20px;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    var(--border-color) 10%,
-    var(--border-color) 90%,
-    transparent 100%
-  );
+.topbar .header-actions .icon-only-btn {
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.2);
 }
 
-/* ─── Brand: Scholarly masthead text ─── */
-.eyebrow {
-  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  font-size: 0.95rem;
-  color: var(--accent-gold);
-  letter-spacing: 0.03em;
+.topbar .header-actions .icon-only-btn:hover {
+  background: rgba(230,185,78,0.15);
+  color: var(--maab-gold);
+  border-color: var(--maab-gold);
 }
 
-h1 {
-  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
-  font-size: 1.9rem;
-  line-height: 1.4;
-  color: var(--text-primary);
-}
-
-/* ─── View tabs: underline-style like maablib nav ─── */
+/* ─── View tabs: underline-style ─── */
 .view-tabs {
   margin-top: 20px;
   margin-bottom: 24px;
@@ -8464,7 +8435,6 @@ h1 {
   padding: 10px 10px 12px;
   border-bottom-width: 3px;
   color: var(--text-secondary);
-  letter-spacing: 0.01em;
 }
 
 .tab-pill:hover {
@@ -8473,54 +8443,31 @@ h1 {
 
 .tab-pill.active {
   color: var(--accent-color);
-  border-bottom-color: var(--accent-gold);
+  border-bottom-color: var(--maab-gold);
 }
 
-/* ─── Collection section headings: ornamental double-rule ─── */
-.collection-title-row,
-.section-title-row {
-  border-bottom: none;
-  padding-bottom: 0;
-  position: relative;
-  margin-bottom: 14px;
-}
-
-.collection-title-row::after,
-.section-title-row::after {
-  content: '';
-  display: block;
-  position: absolute;
-  bottom: -10px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: repeating-linear-gradient(
-    to right,
-    var(--border-gold) 0px,
-    var(--border-gold) 1px,
-    transparent 1px,
-    transparent 6px,
-    var(--border-color) 6px,
-    var(--border-color) 7px,
-    transparent 7px,
-    transparent 10px
-  );
-  opacity: 0.65;
-}
-
+/* ─── Section / collection headings: vertical gold right-bar (maablib RTL style) ─── */
 .collection-title-row h2,
 .section-title-row h2 {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
   font-size: 1.5rem;
   line-height: 1.6;
   color: var(--accent-color);
+  border-right: 4px solid var(--maab-gold);
+  padding-right: 12px;
 }
 
-/* ─── Article cards: bookish elevation ─── */
+.collection-title-row,
+.section-title-row {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+}
+
+/* ─── Article cards: rounded, white, teal-glow hover ─── */
 .article-card {
-  border-radius: 4px;
+  border-radius: 14px;
   border: 1px solid var(--border-color);
-  border-top: 3px solid var(--border-gold);
   background: var(--bg-card);
   padding: 18px 20px 16px;
   box-shadow: var(--card-shadow);
@@ -8529,123 +8476,124 @@ h1 {
 
 .article-card:hover,
 .article-card:focus-visible {
-  border-top-color: var(--accent-color);
-  border-color: var(--border-color);
-  border-top-color: var(--accent-color);
   box-shadow: var(--card-shadow-hover);
   transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent-color) 30%, var(--border-color));
 }
 
-/* ─── Card top row: thinner, cleaner ─── */
+/* Top gold accent bar on each card */
+.article-card::before {
+  content: '';
+  display: block;
+  height: 3px;
+  margin: -18px -20px 14px;
+  border-radius: 14px 14px 0 0;
+  background: var(--maab-gold);
+  opacity: 0.75;
+}
+
+/* ─── Card top/bottom rows ─── */
 .card-top-row {
-  border-bottom: 1px dashed var(--border-color);
+  border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 7px;
   margin-bottom: 6px;
 }
 
-/* ─── Card title: calligraphic headings ─── */
-.article-title {
-  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
-  font-size: 1.38rem;
-  line-height: 1.85;
-  font-weight: 700;
-  color: var(--text-primary);
-  padding: 4px 0 2px;
-}
-
-/* ─── Card excerpt: Nastaleeq body text ─── */
-.article-excerpt {
-  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
-  font-size: 1.08rem;
-  line-height: 2.15;
-  color: var(--text-secondary);
-}
-
-/* ─── Card bottom row: slim ornamental ─── */
 .card-bottom-row {
-  border-top: 1px dashed var(--border-color);
+  border-top: 1px solid var(--border-subtle);
   padding-top: 7px;
   margin-top: 8px;
 }
 
-/* ─── Category badges: scholarly pill ─── */
+/* ─── Card title: calligraphic ─── */
+.article-title {
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
+  font-size: 1.35rem;
+  line-height: 1.80;
+  font-weight: 700;
+  color: var(--maab-green);
+  padding: 4px 0 2px;
+}
+
+/* ─── Card excerpt ─── */
+.article-excerpt {
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
+  font-size: 1.08rem;
+  line-height: 2.1;
+  color: var(--text-secondary);
+}
+
+/* ─── Category badges: mint pill (maablib style) ─── */
 .article-category-badge {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  background: var(--accent-subtle);
-  color: var(--accent-color);
-  border: 1px solid color-mix(in srgb, var(--accent-color) 25%, transparent);
-  border-radius: 2px;
-  padding: 2px 10px;
+  background: var(--maab-mint);
+  color: var(--maab-green);
+  border: 1px solid color-mix(in srgb, var(--maab-green) 20%, transparent);
+  border-radius: 9999px;
+  padding: 2px 12px;
   font-size: 0.82rem;
   font-weight: 400;
 }
 
-/* ─── Category filter tabs: scholarly chips ─── */
+/* ─── Category filter tabs ─── */
 .category-tab {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  border-radius: 2px;
+  border-radius: 9999px;
   font-size: 1rem;
   font-weight: 400;
-  letter-spacing: 0.01em;
   border: 1px solid var(--border-color);
-  padding: 6px 16px;
+  padding: 6px 18px;
 }
 
 .category-tab.active {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-  box-shadow: 0 2px 10px rgba(27,79,58,0.2);
+  background: var(--maab-green);
+  border-color: var(--maab-green);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(13,92,74,0.2);
 }
 
-/* ─── Search box: refined input ─── */
+/* ─── Search box ─── */
 .search-box {
-  border-radius: 3px;
-  border: 1px solid var(--border-color);
-  border-bottom: 2px solid var(--border-gold);
-  background: var(--bg-surface);
+  border-radius: 9999px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
 }
 
 .search-box:focus-within {
-  border-bottom-color: var(--accent-color);
-  box-shadow: 0 2px 12px rgba(27,79,58,0.1);
+  border-color: var(--maab-green);
+  box-shadow: 0 2px 12px rgba(13,92,74,0.1);
 }
 
 /* ─── Status pills ─── */
 .status-pill {
-  border-radius: 2px;
+  border-radius: 9999px;
   font-size: 0.85rem;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-color);
+  background: var(--maab-mint);
+  color: var(--maab-green);
+  border: 1px solid color-mix(in srgb, var(--maab-green) 20%, transparent);
 }
 
-.academic-status-pill {
-  color: var(--accent-color);
-  border-color: color-mix(in srgb, var(--accent-gold) 40%, transparent);
-  background: color-mix(in srgb, var(--accent-gold) 8%, var(--bg-surface));
-}
-
-/* ─── Primary buttons: green with gold touch ─── */
+/* ─── Primary buttons: green capsule ─── */
 .primary-button {
-  border-radius: 3px;
+  border-radius: 9999px;
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 1rem;
-  letter-spacing: 0.01em;
-  box-shadow: 0 1px 4px rgba(27,79,58,0.2);
+  box-shadow: 0 1px 4px rgba(13,92,74,0.2);
 }
 
 .primary-button:hover:not(:disabled) {
-  box-shadow: 0 3px 10px rgba(27,79,58,0.3);
+  box-shadow: 0 3px 12px rgba(13,92,74,0.3);
 }
 
 .secondary-button,
 .action-button,
 .action-link {
-  border-radius: 3px;
+  border-radius: 9999px;
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 0.95rem;
 }
 
-/* ─── Icon-only action buttons ─── */
+/* ─── Icon-only buttons ─── */
 .icon-only-btn {
   border-radius: 50%;
   width: 36px;
@@ -8653,60 +8601,56 @@ h1 {
   padding: 0;
 }
 
-/* ─── Reading page: editorial article layout ─── */
+/* ─── Reading page: editorial layout ─── */
 .academic-reading-page {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-top: 4px solid var(--accent-gold);
-  border-radius: 4px;
-  box-shadow: 0 4px 24px rgba(26,40,28,0.08);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(13,92,74,0.06);
 }
 
 .reading-page-nav {
   border-bottom: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--accent-color) 4%, var(--bg-surface));
+  background: color-mix(in srgb, var(--maab-green) 4%, var(--bg-surface));
   padding: 10px 20px;
-  border-radius: 4px 4px 0 0;
+  border-radius: 16px 16px 0 0;
 }
 
-/* Reading title: big Nastaleeq calligraphy */
+/* Reading title: big Nastaleeq + gold underline */
 .reading-article-title {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
   font-size: 2.4rem;
   line-height: 1.85;
   font-weight: 800;
-  color: var(--text-primary);
-  border-bottom: 2px solid var(--border-gold);
+  color: var(--maab-green);
+  border-bottom: 3px solid var(--maab-gold);
   padding-bottom: 14px;
   margin-bottom: 20px;
-  letter-spacing: 0;
 }
 
-/* Reading body text */
+/* Reading body */
 .reading-article-body {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
   font-size: 1.25rem;
   line-height: 2.4;
   color: var(--text-primary);
-  letter-spacing: 0.01em;
 }
 
-/* Reading meta bar */
+/* Reading meta */
 .reading-meta-bar {
-  border-bottom: 1px dashed var(--border-color);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 12px;
   margin-bottom: 20px;
 }
 
 .reading-category-pill {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  background: var(--accent-subtle);
-  color: var(--accent-color);
-  border: 1px solid color-mix(in srgb, var(--accent-color) 25%, transparent);
-  border-radius: 2px;
+  background: var(--maab-mint);
+  color: var(--maab-green);
+  border: 1px solid color-mix(in srgb, var(--maab-green) 20%, transparent);
+  border-radius: 9999px;
   font-size: 0.88rem;
-  font-weight: 400;
-  padding: 2px 10px;
+  padding: 2px 12px;
 }
 
 .reading-date-pill,
@@ -8714,48 +8658,41 @@ h1 {
 .reading-readtime-pill {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 0.88rem;
+  border-radius: 9999px;
 }
 
-/* Reading page footer */
+/* Reading footer */
 .reading-page-footer {
   border-top: 2px solid var(--border-color);
   margin-top: 32px;
   padding-top: 18px;
 }
 
-/* ─── Reading footer nav: editorial prev/next buttons ─── */
 .reading-footer-nav button {
-  border-radius: 3px;
+  border-radius: 9999px;
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 1rem;
 }
 
 /* ─── Composer / Add Thought form ─── */
 .capture-card {
-  border-radius: 4px;
+  border-radius: 16px;
   border: 1px solid var(--border-color);
-  border-top: 3px solid var(--accent-gold);
-  box-shadow: 0 2px 12px rgba(26,40,28,0.06);
+  border-top: 3px solid var(--maab-gold);
+  box-shadow: 0 2px 12px rgba(13,92,74,0.06);
 }
 
 .section-heading h2 {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 1.7rem;
-  color: var(--accent-color);
-}
-
-.field span {
-  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  font-size: 0.95rem;
-  color: var(--text-secondary);
+  color: var(--maab-green);
 }
 
 .field input,
 .field textarea,
 .field select {
-  border-radius: 3px;
+  border-radius: 8px;
   border: 1px solid var(--border-color);
-  border-bottom: 2px solid var(--border-color);
   background: var(--bg-input);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -8763,12 +8700,12 @@ h1 {
 .field input:focus,
 .field textarea:focus,
 .field select:focus {
-  border-bottom-color: var(--accent-gold);
-  box-shadow: 0 2px 10px rgba(27,79,58,0.1);
+  border-color: var(--maab-gold);
+  box-shadow: 0 2px 10px rgba(13,92,74,0.1);
 }
 
 .rich-text-editor {
-  border-radius: 3px;
+  border-radius: 8px;
   border: 1px solid var(--border-color);
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
   font-size: 1.1rem;
@@ -8778,42 +8715,42 @@ h1 {
 }
 
 .rich-text-editor:focus {
-  border-color: var(--border-gold);
-  box-shadow: 0 2px 10px rgba(181,136,42,0.12);
+  border-color: var(--maab-gold);
+  box-shadow: 0 2px 10px rgba(230,185,78,0.15);
 }
 
-/* ─── Toolbar: clean, bookish ─── */
+/* ─── Toolbar ─── */
 .rich-toolbar {
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
-  border-radius: 3px;
+  border-radius: 8px;
   gap: 4px 8px;
 }
 
 .toolbar-btn {
-  border-radius: 3px;
+  border-radius: 6px;
 }
 
 .toolbar-btn.active {
-  background: color-mix(in srgb, var(--accent-gold) 15%, var(--bg-surface));
-  color: var(--accent-gold);
-  border-color: var(--accent-gold);
+  background: color-mix(in srgb, var(--maab-gold) 15%, var(--bg-surface));
+  color: color-mix(in srgb, var(--maab-gold) 60%, #000);
+  border-color: var(--maab-gold);
 }
 
 /* ─── Save button ─── */
 .save-button {
-  border-radius: 3px;
+  border-radius: 9999px;
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 1.05rem;
   background: var(--primary-btn-bg);
   color: var(--primary-btn-text);
-  box-shadow: 0 2px 8px rgba(27,79,58,0.25);
+  box-shadow: 0 2px 8px rgba(13,92,74,0.25);
   transition: all 180ms ease;
 }
 
 .save-button:hover:not(:disabled) {
   background: var(--primary-btn-hover);
-  box-shadow: 0 4px 14px rgba(27,79,58,0.35);
+  box-shadow: 0 4px 14px rgba(13,92,74,0.35);
   transform: translateY(-1px);
 }
 
@@ -8821,15 +8758,17 @@ h1 {
 .collections-heading h2 {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 2.1rem;
-  color: var(--accent-color);
+  color: var(--maab-green);
   line-height: 1.6;
+  border-right: 4px solid var(--maab-gold);
+  padding-right: 12px;
 }
 
 /* ─── Empty state ─── */
 .empty-state {
-  border: 1px dashed var(--border-gold);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--accent-gold) 4%, var(--bg-surface));
+  border: 1px dashed var(--maab-gold);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--maab-gold) 4%, var(--bg-surface));
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 1.1rem;
 }
@@ -8837,22 +8776,21 @@ h1 {
 /* ─── Category "more" link ─── */
 .category-more-link {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  border-radius: 2px;
-  border: 1px dashed var(--accent-gold);
-  color: var(--accent-gold);
+  border-radius: 9999px;
+  border: 1px solid var(--maab-gold);
+  color: var(--maab-green);
 }
 
 .category-more-link:hover {
-  background: color-mix(in srgb, var(--accent-gold) 10%, var(--bg-surface));
-  border-color: var(--accent-color);
-  color: var(--accent-color);
+  background: var(--maab-mint);
+  border-color: var(--maab-green);
 }
 
 /* ─── Spotlight (Similar view seed card) ─── */
 .seed-spotlight-card {
   border: 1px solid var(--border-color);
-  border-top: 3px solid var(--accent-gold);
-  border-radius: 4px;
+  border-top: 3px solid var(--maab-gold);
+  border-radius: 14px;
   background: var(--bg-card);
   box-shadow: var(--card-shadow);
 }
@@ -8861,20 +8799,20 @@ h1 {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
   font-size: 1.4rem;
   line-height: 1.85;
-  color: var(--text-primary);
+  color: var(--maab-green);
 }
 
 .spotlight-body {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
   font-size: 1.08rem;
-  line-height: 2.15;
+  line-height: 2.1;
 }
 
 .spotlight-category {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  border-radius: 2px;
-  background: var(--accent-subtle);
-  color: var(--accent-color);
+  border-radius: 9999px;
+  background: var(--maab-mint);
+  color: var(--maab-green);
 }
 
 /* ─── Similar card title ─── */
@@ -8882,42 +8820,44 @@ h1 {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif !important;
   font-size: 1.28rem;
   line-height: 1.85;
+  color: var(--maab-green);
 }
 
 /* ─── Settings card ─── */
 .settings-card {
-  border-radius: 4px;
+  border-radius: 14px;
   border: 1px solid var(--border-color);
-  border-top: 2px solid var(--border-gold);
+  border-top: 3px solid var(--maab-gold);
   background: var(--bg-surface);
 }
 
 /* ─── Toast notification ─── */
 .paste-toast {
-  border-radius: 3px;
+  border-radius: 9999px;
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 0.95rem;
-  background: var(--accent-color);
+  background: var(--maab-green);
   color: #fff;
-  box-shadow: 0 4px 20px rgba(27,79,58,0.35);
+  box-shadow: 0 4px 20px rgba(13,92,74,0.35);
 }
 
-/* ─── Password modal ─── */
-.preview-backdrop {
-  backdrop-filter: blur(4px);
-}
-
-/* ─── Mobile Nav FAB: refined ─── */
+/* ─── Mobile Nav FAB ─── */
 .mobile-nav-fab {
   border-radius: 50%;
-  box-shadow: 0 4px 16px rgba(27,79,58,0.3);
+  box-shadow: 0 4px 16px rgba(13,92,74,0.3);
 }
 
 .mobile-nav-item {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
+  border-radius: 9999px;
 }
 
-/* ─── Article card color tints: warmer, more parchment-toned ─── */
+.mobile-nav-item.active {
+  background: var(--maab-mint);
+  color: var(--maab-green);
+}
+
+/* ─── Article card color tints (warmer) ─── */
 .card-color-amber {
   background-color: #fefcf0 !important;
   border-color: #e8d5a0 !important;
@@ -8934,28 +8874,27 @@ h1 {
 /* ─── Blockquote in content ─── */
 .rich-text-editor blockquote,
 .rendered-rich-content blockquote {
-  border-inline-start: 4px solid var(--accent-gold);
+  border-inline-start: 4px solid var(--maab-gold);
   padding: 6px 14px;
-  background: color-mix(in srgb, var(--accent-gold) 6%, var(--bg-surface));
+  background: color-mix(in srgb, var(--maab-gold) 6%, var(--bg-surface));
   font-style: italic;
   color: var(--text-secondary);
-  border-radius: 2px;
+  border-radius: 8px;
 }
 
-/* ─── Section headings in settings ─── */
+/* ─── Settings section headings ─── */
 .settings-section-heading,
 .glass-settings-heading {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  color: var(--accent-color);
+  color: var(--maab-green);
 }
 
-/* ─── Article grid: slightly more generous spacing ─── */
+/* ─── Article & collection grid spacing ─── */
 .article-grid,
 .article-list {
   gap: 16px;
 }
 
-/* ─── Collection section: wider breathing room ─── */
 .collection-section-grid {
   gap: 32px 28px;
 }
@@ -8966,40 +8905,33 @@ h1 {
 }
 
 .icon-button:hover {
-  background: color-mix(in srgb, var(--accent-gold) 10%, var(--bg-subtle));
-  color: var(--accent-color);
+  background: color-mix(in srgb, var(--maab-gold) 10%, var(--bg-subtle));
+  color: var(--maab-green);
 }
 
-/* ─── Scroll bars: slim, gold-ish ─── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ─── Scroll bars: slim, gold ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-gold);
+  background: var(--maab-gold);
   border-radius: 3px;
   opacity: 0.6;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-color);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--maab-green); }
 
-/* ─── Focus rings: green ─── */
+/* ─── Focus rings ─── */
 :focus-visible {
-  outline: 2px solid var(--accent-color);
+  outline: 2px solid var(--maab-green);
   outline-offset: 2px;
 }
 
 /* ─── Selection highlight ─── */
 ::selection {
-  background: color-mix(in srgb, var(--accent-gold) 25%, transparent);
+  background: color-mix(in srgb, var(--maab-gold) 25%, transparent);
   color: var(--text-primary);
 }
 
-/* ─── Article meta: muted Nastaleeq ─── */
+/* ─── Article meta ─── */
 .article-meta {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
   font-size: 0.88rem;
@@ -9009,25 +8941,15 @@ h1 {
 /* ─── Article open link ─── */
 .article-open {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif;
-  color: var(--accent-gold);
+  color: var(--maab-green);
   font-size: 0.9rem;
 }
 
-/* ─── Responsive adjustments ─── */
+/* ─── Responsive ─── */
 @media (max-width: 680px) {
-  .reading-article-title {
-    font-size: 1.9rem;
-    line-height: 1.75;
-  }
-  .article-title {
-    font-size: 1.25rem;
-  }
-  .collection-title-row h2,
-  .section-title-row h2 {
-    font-size: 1.3rem;
-  }
-  .collections-heading h2 {
-    font-size: 1.75rem;
-  }
+  .reading-article-title { font-size: 1.9rem; line-height: 1.75; }
+  .article-title { font-size: 1.25rem; }
+  .collection-title-row h2, .section-title-row h2 { font-size: 1.3rem; }
+  .collections-heading h2 { font-size: 1.75rem; }
 }
 
