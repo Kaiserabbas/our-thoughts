@@ -662,8 +662,9 @@ h1 {
 /* ── Card Heading with Enhanced Padding ── */
 .article-title {
   color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
   font-size: 1.32rem;
-  line-height: 2;
+  line-height: 1.6;
   font-weight: 700;
   padding: 8px 0 4px;
   margin: 0;
@@ -968,6 +969,73 @@ h1 {
 .field textarea {
   min-height: 130px;
   resize: vertical;
+}
+
+.rich-text-editor {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  outline: none;
+  min-height: 140px;
+  max-height: 480px;
+  overflow-y: auto;
+  line-height: 1.8;
+  word-break: break-word;
+  white-space: pre-wrap;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  font-size: 1.05rem;
+}
+
+.rich-text-editor:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(18, 93, 1, 0.12);
+}
+
+[data-theme='dark'] .rich-text-editor:focus {
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+}
+
+.rich-text-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: block;
+}
+
+.rich-text-editor blockquote,
+.rendered-rich-content blockquote {
+  border-inline-start: 3px solid var(--accent-color);
+  padding: 4px 12px;
+  margin: 8px 0;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  border-radius: 4px;
+}
+
+.rich-text-editor ul,
+.rich-text-editor ol,
+.rendered-rich-content ul,
+.rendered-rich-content ol {
+  padding-inline-start: 24px;
+  margin: 6px 0;
+}
+
+.rendered-rich-content {
+  line-height: 1.85;
+  word-break: break-word;
+}
+
+.rendered-rich-content p,
+.rendered-rich-content div {
+  margin: 0 0 8px 0;
+}
+
+.rendered-rich-content p:last-child,
+.rendered-rich-content div:last-child {
+  margin-bottom: 0;
 }
 
 /* ── Rich Formatting Toolbar ── */
@@ -6226,8 +6294,9 @@ h1 {
 }
 
 .reading-article-title {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
   font-size: 2.35rem;
-  line-height: 1.8;
+  line-height: 1.5;
   font-weight: 800;
   color: var(--text-primary);
   margin: 0 0 20px 0;
@@ -7265,11 +7334,14 @@ h1 {
 }
 
 .article-title,
+.reading-article-title {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
+}
+
 .article-excerpt,
 .strand-name,
 .spotlight-title,
 .spotlight-body,
-.reading-article-title,
 .reading-article-body {
   font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Georgia, serif;
 }

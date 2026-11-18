@@ -302,7 +302,12 @@ export default function SimilarThoughtsView({
                     </button>
                   </div>
                 </div>
-                <strong className="article-title">{thought.subject || 'بلا عنوان'}</strong>
+                <strong
+                  className="article-title"
+                  style={{ fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }}
+                >
+                  {thought.subject || 'بلا عنوان'}
+                </strong>
                 <p className="article-excerpt">{summarizeText(thought.description, 160)}</p>
                 <div className="card-bottom-row">
                   <span className="article-category-badge">

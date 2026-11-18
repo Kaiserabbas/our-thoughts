@@ -50,6 +50,7 @@ import {
   Pipette,
   Plus,
   Quote,
+  RemoveFormatting,
   RotateCw,
   Save,
   Search,
@@ -61,6 +62,7 @@ import {
   Tag,
   Trash2,
   Type,
+  Underline,
   User,
   Volume2,
   VolumeX,
@@ -207,8 +209,31 @@ function parseInlineMarkdown(text, highlightQuery) {
   });
 }
 
+function stripHtml(html = '') {
+  if (!html) return '';
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .trim();
+}
+
 function renderFormattedContent(text, highlightQuery) {
   if (!text) return 'No description added yet.';
+  if (/<[a-z][\s\S]*>/i.test(text)) {
+    return (
+      <div
+        className="rendered-rich-content"
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    );
+  }
   const lines = text.split('\n');
 
   return lines.map((line, idx) => {
@@ -288,6 +313,197 @@ function parseHashRoute(hash) {
   }
 
   return { view: 'home', thoughtId: null, isEdit: false };
+}
+
+function RichEditor({
+  value,
+  onChange,
+  placeholder,
+  dir = 'auto',
+  className,
+  style,
+  editorRef,
+  onSaveShortcut,
+  savedRangeRef,
+}) {
+  const internalRef = useRef(null);
+  const ref = editorRef || internalRef;
+  const isInternalUpdate = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
+    const currentHtml = el.innerHTML;
+    if (currentHtml !== (value || '')) {
+      const formatted = value && !/<[a-z][\s\S]*>/i.test(value)
+        ? value.replace(/\n/g, '<br>')
+        : (value || '');
+      el.innerHTML = formatted;
+    }
+  }, [value, ref]);
+
+  const recordSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && ref.current?.contains(sel.anchorNode)) {
+      if (savedRangeRef) {
+        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+      }
+    }
+  };
+
+  const handleInput = () => {
+    const el = ref.current;
+    if (!el) return;
+    isInternalUpdate.current = true;
+    recordSelection();
+    const html = el.innerHTML;
+    const clean = html === '<br>' || html === '<p><br></p>' || !html.trim() ? '' : html;
+    onChange(clean);
+  };
+
+  return (
+    <div
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      className={`rich-text-editor ${className || ''}`}
+      style={style}
+      dir={dir}
+      data-placeholder={placeholder}
+      onInput={handleInput}
+      onBlur={() => {
+        recordSelection();
+        handleInput();
+      }}
+      onKeyUp={recordSelection}
+      onMouseUp={recordSelection}
+      onTouchEnd={recordSelection}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          if (onSaveShortcut) onSaveShortcut();
+        }
+      }}
+    />
+  );
+}
+
+function applyFormatting({
+  editorRef,
+  savedRangeRef,
+  action,
+  value,
+  onUpdate,
+}) {
+  const el = editorRef?.current;
+  if (!el) return;
+  el.focus();
+
+  const sel = window.getSelection();
+  if (savedRangeRef?.current) {
+    try {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    } catch {}
+  }
+
+  if (!sel || sel.rangeCount === 0) return;
+
+  // If selection is collapsed but cursor is within a word, expand selection to that word
+  if (sel.isCollapsed && ['font', 'color', 'bold', 'italic', 'underline', 'clear'].includes(action)) {
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node && node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent;
+      let start = range.startOffset;
+      let end = range.startOffset;
+      while (start > 0 && !/\s/.test(text[start - 1])) start--;
+      while (end < text.length && !/\s/.test(text[end])) end++;
+      if (start < end) {
+        const wordRange = document.createRange();
+        wordRange.setStart(node, start);
+        wordRange.setEnd(node, end);
+        sel.removeAllRanges();
+        sel.addRange(wordRange);
+      }
+    }
+  }
+
+  try {
+    document.execCommand('styleWithCSS', false, true);
+  } catch {}
+
+  if (action === 'bold') {
+    document.execCommand('bold', false, null);
+  } else if (action === 'italic') {
+    document.execCommand('italic', false, null);
+  } else if (action === 'underline') {
+    document.execCommand('underline', false, null);
+  } else if (action === 'clear') {
+    document.execCommand('removeFormat', false, null);
+  } else if (action === 'list') {
+    document.execCommand('insertUnorderedList', false, null);
+  } else if (action === 'quote') {
+    document.execCommand('formatBlock', false, 'blockquote');
+  } else if (action === 'align') {
+    if (value === 'left') document.execCommand('justifyLeft', false, null);
+    else if (value === 'center') document.execCommand('justifyCenter', false, null);
+    else if (value === 'right') document.execCommand('justifyRight', false, null);
+    else if (value === 'justify') document.execCommand('justifyFull', false, null);
+  } else if (action === 'color') {
+    if (!sel.isCollapsed) {
+      const range = sel.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.color = value;
+      try {
+        range.surroundContents(span);
+      } catch {
+        const content = range.extractContents();
+        span.appendChild(content);
+        range.insertNode(span);
+      }
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    } else {
+      document.execCommand('foreColor', false, value);
+    }
+  } else if (action === 'font') {
+    const fontCss = getFontFamilyCss(value) || value;
+    if (fontCss) {
+      if (!sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        const span = document.createElement('span');
+        span.style.fontFamily = fontCss;
+        try {
+          range.surroundContents(span);
+        } catch {
+          const content = range.extractContents();
+          span.appendChild(content);
+          range.insertNode(span);
+        }
+        const newRange = document.createRange();
+        newRange.selectNodeContents(span);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        document.execCommand('fontName', false, fontCss);
+      }
+    }
+  }
+
+  if (sel.rangeCount > 0 && savedRangeRef) {
+    savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+  }
+
+  if (onUpdate) {
+    onUpdate(el.innerHTML);
+  }
 }
 
 export default function App() {
@@ -723,25 +939,19 @@ export default function App() {
     if (!text) return;
     const ref = isEdit ? editTextareaRef : addTextareaRef;
     const setForm = isEdit ? setEditFormData : setFormData;
-    const textarea = ref.current;
-    if (textarea) {
-      const start = textarea.selectionStart ?? 0;
-      const end = textarea.selectionEnd ?? 0;
-      setForm((current) => {
-        const desc = current.description || '';
-        const updated = desc.substring(0, start) + text + desc.substring(end);
-        return { ...current, description: updated };
-      });
-      setTimeout(() => {
-        textarea.focus();
-        const cursor = start + text.length;
-        textarea.setSelectionRange(cursor, cursor);
-      }, 50);
+    const el = ref.current;
+    if (el && document.activeElement === el) {
+      document.execCommand('insertText', false, text);
+      setForm((current) => ({ ...current, description: el.innerHTML }));
     } else {
-      setForm((current) => ({
-        ...current,
-        description: current.description ? `${current.description}\n${text}` : text,
-      }));
+      const htmlToInsert = text.replace(/\n/g, '<br>');
+      setForm((current) => {
+        const prev = current.description || '';
+        return {
+          ...current,
+          description: prev ? `${prev}<br>${htmlToInsert}` : htmlToInsert,
+        };
+      });
     }
     showPasteToast('Pasted into description!');
   };
@@ -769,6 +979,8 @@ export default function App() {
 
   const addTextareaRef = useRef(null);
   const editTextareaRef = useRef(null);
+  const addSavedRangeRef = useRef(null);
+  const editSavedRangeRef = useRef(null);
   const isSyncingRef = useRef(false);
   const queuedSyncRef = useRef(null);
 
@@ -1078,38 +1290,13 @@ export default function App() {
     const t = thoughtToCopy || selectedThought;
     if (!t) return;
 
-    const textToCopy = `${t.subject}\n\n${t.description}\n\nCategory: ${t.category} | ${formatDate(t.entryDate || t.createdAt)}`;
+    const cleanDesc = stripHtml(t.description);
+    const textToCopy = `${t.subject}\n\n${cleanDesc}\n\nCategory: ${t.category} | ${formatDate(t.entryDate || t.createdAt)}`;
     await copyToClipboard(textToCopy);
     setCopiedThought(true);
     setTimeout(() => setCopiedThought(false), 2000);
   };
 
-  // Formatting tool helper: insert markdown tags into textarea
-  const handleInsertTag = (textareaRef, tagStart, tagEnd, isEdit = false) => {
-    const el = textareaRef.current;
-    const setForm = isEdit ? setEditFormData : setFormData;
-
-    if (!el) {
-      setForm((prev) => ({ ...prev, description: `${prev.description}${tagStart}${tagEnd}` }));
-      return;
-    }
-
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const val = el.value;
-    const selected = val.slice(start, end);
-    const replacement = `${tagStart}${selected || 'text'}${tagEnd}`;
-    const nextVal = val.slice(0, start) + replacement + val.slice(end);
-
-    setForm((prev) => ({ ...prev, description: nextVal }));
-
-    setTimeout(() => {
-      el.focus();
-      const cursorStart = start + tagStart.length;
-      const cursorEnd = cursorStart + (selected ? selected.length : 4);
-      el.setSelectionRange(cursorStart, cursorEnd);
-    }, 0);
-  };
 
   // Save new thought
   const handleSaveThought = async (event) => {
@@ -1371,14 +1558,17 @@ export default function App() {
 
   const favoriteCount = thoughts.filter((thought) => thought.favorite).length;
   const summarizeText = (value, max = 112) => {
-    const baseValue = value || 'No description added yet.';
-    return baseValue.length > max ? `${baseValue.slice(0, max)}...` : baseValue;
+    if (!value) return 'No description added yet.';
+    const plainText = stripHtml(value).replace(/\s+/g, ' ');
+    if (!plainText) return 'No description added yet.';
+    return plainText.length > max ? `${plainText.slice(0, max)}...` : plainText;
   };
 
   const getCounts = (text = '') => {
-    const trimmed = text.trim();
-    const words = trimmed ? trimmed.split(/\s+/).length : 0;
-    const chars = text.length;
+    const plain = stripHtml(text);
+    const trimmed = plain.trim();
+    const words = trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
+    const chars = plain.length;
     return `${words} words · ${chars} characters`;
   };
 
@@ -1666,7 +1856,7 @@ export default function App() {
                     placeholder="Thought subject"
                     dir="auto"
                     style={{
-                      fontFamily: getFontFamilyCss(editFormData.fontFamily),
+                      fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                     }}
                   />
                 </div>
@@ -1704,7 +1894,17 @@ export default function App() {
                       <button
                         type="button"
                         className={`toolbar-btn ${editFormData.descriptionAlign === 'left' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'left' }))}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setEditFormData((c) => ({ ...c, descriptionAlign: 'left' }));
+                          applyFormatting({
+                            editorRef: editTextareaRef,
+                            savedRangeRef: editSavedRangeRef,
+                            action: 'align',
+                            value: 'left',
+                            onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                          });
+                        }}
                         title="Align left"
                       >
                         <AlignLeft size={14} />
@@ -1712,7 +1912,17 @@ export default function App() {
                       <button
                         type="button"
                         className={`toolbar-btn ${editFormData.descriptionAlign === 'center' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'center' }))}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setEditFormData((c) => ({ ...c, descriptionAlign: 'center' }));
+                          applyFormatting({
+                            editorRef: editTextareaRef,
+                            savedRangeRef: editSavedRangeRef,
+                            action: 'align',
+                            value: 'center',
+                            onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                          });
+                        }}
                         title="Align center"
                       >
                         <AlignCenter size={14} />
@@ -1720,7 +1930,17 @@ export default function App() {
                       <button
                         type="button"
                         className={`toolbar-btn ${editFormData.descriptionAlign === 'right' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'right' }))}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setEditFormData((c) => ({ ...c, descriptionAlign: 'right' }));
+                          applyFormatting({
+                            editorRef: editTextareaRef,
+                            savedRangeRef: editSavedRangeRef,
+                            action: 'align',
+                            value: 'right',
+                            onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                          });
+                        }}
                         title="Align right"
                       >
                         <AlignRight size={14} />
@@ -1728,7 +1948,17 @@ export default function App() {
                       <button
                         type="button"
                         className={`toolbar-btn ${editFormData.descriptionAlign === 'justify' ? 'active' : ''}`}
-                        onClick={() => setEditFormData((c) => ({ ...c, descriptionAlign: 'justify' }))}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setEditFormData((c) => ({ ...c, descriptionAlign: 'justify' }));
+                          applyFormatting({
+                            editorRef: editTextareaRef,
+                            savedRangeRef: editSavedRangeRef,
+                            action: 'align',
+                            value: 'justify',
+                            onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                          });
+                        }}
                         title="Justify text"
                       >
                         <AlignJustify size={14} />
@@ -1740,36 +1970,70 @@ export default function App() {
                     <div className="toolbar-group">
                       <button
                         type="button"
-                        className={`toolbar-btn ${editFormData.isBold ? 'active' : ''}`}
-                        onClick={() => {
-                          if (editTextareaRef.current?.selectionStart !== editTextareaRef.current?.selectionEnd) {
-                            handleInsertTag(editTextareaRef, '**', '**', true);
-                          } else {
-                            setEditFormData((c) => ({ ...c, isBold: !c.isBold }));
-                          }
-                        }}
-                        title="Bold"
+                        className="toolbar-btn"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyFormatting({
+                          editorRef: editTextareaRef,
+                          savedRangeRef: editSavedRangeRef,
+                          action: 'bold',
+                          onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                        })}
+                        title="Bold (Selection or current word)"
                       >
                         <Bold size={14} />
                       </button>
                       <button
                         type="button"
-                        className={`toolbar-btn ${editFormData.isItalic ? 'active' : ''}`}
-                        onClick={() => {
-                          if (editTextareaRef.current?.selectionStart !== editTextareaRef.current?.selectionEnd) {
-                            handleInsertTag(editTextareaRef, '*', '*', true);
-                          } else {
-                            setEditFormData((c) => ({ ...c, isItalic: !c.isItalic }));
-                          }
-                        }}
-                        title="Italic"
+                        className="toolbar-btn"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyFormatting({
+                          editorRef: editTextareaRef,
+                          savedRangeRef: editSavedRangeRef,
+                          action: 'italic',
+                          onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                        })}
+                        title="Italic (Selection or current word)"
                       >
                         <Italic size={14} />
                       </button>
                       <button
                         type="button"
                         className="toolbar-btn"
-                        onClick={() => handleInsertTag(editTextareaRef, '\n• ', '', true)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyFormatting({
+                          editorRef: editTextareaRef,
+                          savedRangeRef: editSavedRangeRef,
+                          action: 'underline',
+                          onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                        })}
+                        title="Underline (Selection or current word)"
+                      >
+                        <Underline size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="toolbar-btn"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyFormatting({
+                          editorRef: editTextareaRef,
+                          savedRangeRef: editSavedRangeRef,
+                          action: 'clear',
+                          onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                        })}
+                        title="Clear formatting on selection"
+                      >
+                        <RemoveFormatting size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="toolbar-btn"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyFormatting({
+                          editorRef: editTextareaRef,
+                          savedRangeRef: editSavedRangeRef,
+                          action: 'list',
+                          onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                        })}
                         title="Bullet point"
                       >
                         <List size={14} />
@@ -1777,7 +2041,13 @@ export default function App() {
                       <button
                         type="button"
                         className="toolbar-btn"
-                        onClick={() => handleInsertTag(editTextareaRef, '\n> ', '', true)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyFormatting({
+                          editorRef: editTextareaRef,
+                          savedRangeRef: editSavedRangeRef,
+                          action: 'quote',
+                          onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                        })}
                         title="Quote"
                       >
                         <Quote size={14} />
@@ -1787,26 +2057,39 @@ export default function App() {
                     <div className="toolbar-divider" />
 
                     <div className="toolbar-color-group">
-                      <span className="toolbar-label" title="Text Color">
+                      <span className="toolbar-label" title="Text Color for word or selection">
                         <Type size={13} />
                       </span>
                       {TEXT_COLORS.map((tc) => (
                         <button
                           key={tc.id}
                           type="button"
-                          className={`color-dot-btn ${editFormData.textColor === tc.color ? 'active' : ''}`}
+                          className="color-dot-btn"
                           style={{ backgroundColor: tc.color || 'var(--text-primary)' }}
-                          onClick={() => setEditFormData((c) => ({ ...c, textColor: tc.color }))}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyFormatting({
+                            editorRef: editTextareaRef,
+                            savedRangeRef: editSavedRangeRef,
+                            action: 'color',
+                            value: tc.color,
+                            onUpdate: (html) => setEditFormData((c) => ({ ...c, textColor: tc.color, description: html })),
+                          })}
                           title={tc.label}
                           aria-label={tc.label}
                         />
                       ))}
-                      <label className="custom-color-picker-btn" title="Pick custom text color">
+                      <label className="custom-color-picker-btn" title="Pick custom text color for word or selection">
                         <input
                           type="color"
                           className="custom-color-input"
-                          value={editFormData.textColor?.startsWith('#') ? editFormData.textColor : '#1f2937'}
-                          onChange={(e) => setEditFormData((c) => ({ ...c, textColor: e.target.value }))}
+                          value="#1f2937"
+                          onChange={(e) => applyFormatting({
+                            editorRef: editTextareaRef,
+                            savedRangeRef: editSavedRangeRef,
+                            action: 'color',
+                            value: e.target.value,
+                            onUpdate: (html) => setEditFormData((c) => ({ ...c, textColor: e.target.value, description: html })),
+                          })}
                           aria-label="Custom text color"
                         />
                         <Pipette size={11} className="picker-pipette-icon" />
@@ -1816,17 +2099,30 @@ export default function App() {
                     <div className="toolbar-divider" />
 
                     <div className="toolbar-group font-select-group">
-                      <span className="toolbar-label" title="Font Style">
+                      <span className="toolbar-label" title="Font Style for word or selection">
                         <Type size={13} />
                       </span>
                       <select
                         className="font-picker-select"
-                        value={editFormData.fontFamily || ''}
-                        onChange={(e) => setEditFormData((c) => ({ ...c, fontFamily: e.target.value }))}
-                        title="Select Font"
+                        defaultValue=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== undefined && val !== null) {
+                            applyFormatting({
+                              editorRef: editTextareaRef,
+                              savedRangeRef: editSavedRangeRef,
+                              action: 'font',
+                              value: val,
+                              onUpdate: (html) => setEditFormData((c) => ({ ...c, description: html })),
+                            });
+                            e.target.value = '';
+                          }
+                        }}
+                        title="Select Font for word or selection"
                         aria-label="Font family"
                       >
-                        <option value="">Default Font</option>
+                        <option value="">Font Style...</option>
+                        <option value="">Default Font (ریسیٹ)</option>
                         <optgroup label="── Urdu & Arabic Fonts (خطوط اردو وعربية) ──">
                           {FONT_OPTIONS.filter((f) => f.group === 'Urdu / Arabic').map((f) => (
                             <option key={f.id} value={f.id}>
@@ -1845,20 +2141,17 @@ export default function App() {
                     </div>
                   </div>
 
-                  <textarea
-                    ref={editTextareaRef}
-                    rows="7"
+                  <RichEditor
+                    editorRef={editTextareaRef}
+                    savedRangeRef={editSavedRangeRef}
                     value={editFormData.description}
-                    onChange={(event) => setEditFormData((current) => ({ ...current, description: event.target.value }))}
-                    placeholder="Update the thought... (Supports **bold**, *italic*, bullets •)"
+                    onChange={(html) => setEditFormData((current) => ({ ...current, description: html }))}
+                    placeholder="Update the thought... (Select any word to apply different fonts, colors, and formatting)"
                     dir="auto"
                     style={{
                       textAlign: editFormData.descriptionAlign || 'right',
-                      color: editFormData.textColor || undefined,
-                      fontWeight: editFormData.isBold ? '700' : 'normal',
-                      fontStyle: editFormData.isItalic ? 'italic' : 'normal',
-                      fontFamily: getFontFamilyCss(editFormData.fontFamily),
                     }}
+                    onSaveShortcut={() => handleUpdateThought()}
                   />
                   <div className="textarea-footer">
                     <span className="counter-text">{getCounts(editFormData.description)}</span>
@@ -2041,7 +2334,7 @@ export default function App() {
                   className="reading-article-title"
                   dir="auto"
                   style={{
-                    fontFamily: getFontFamilyCss(selectedThought.fontFamily) || "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', serif",
+                    fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                   }}
                 >
                   {highlightSearchWords(selectedThought.subject || 'بلا عنوان فکر', inReadingSearchQuery)}
@@ -2411,7 +2704,7 @@ export default function App() {
                       placeholder="What sparked this thought?"
                       dir="auto"
                       style={{
-                        fontFamily: getFontFamilyCss(formData.fontFamily),
+                        fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                       }}
                     />
                   </div>
@@ -2450,7 +2743,17 @@ export default function App() {
                         <button
                           type="button"
                           className={`toolbar-btn ${formData.descriptionAlign === 'left' ? 'active' : ''}`}
-                          onClick={() => setFormData((c) => ({ ...c, descriptionAlign: 'left' }))}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((c) => ({ ...c, descriptionAlign: 'left' }));
+                            applyFormatting({
+                              editorRef: addTextareaRef,
+                              savedRangeRef: addSavedRangeRef,
+                              action: 'align',
+                              value: 'left',
+                              onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                            });
+                          }}
                           title="Align left"
                         >
                           <AlignLeft size={14} />
@@ -2458,7 +2761,17 @@ export default function App() {
                         <button
                           type="button"
                           className={`toolbar-btn ${formData.descriptionAlign === 'center' ? 'active' : ''}`}
-                          onClick={() => setFormData((c) => ({ ...c, descriptionAlign: 'center' }))}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((c) => ({ ...c, descriptionAlign: 'center' }));
+                            applyFormatting({
+                              editorRef: addTextareaRef,
+                              savedRangeRef: addSavedRangeRef,
+                              action: 'align',
+                              value: 'center',
+                              onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                            });
+                          }}
                           title="Align center"
                         >
                           <AlignCenter size={14} />
@@ -2466,7 +2779,17 @@ export default function App() {
                         <button
                           type="button"
                           className={`toolbar-btn ${formData.descriptionAlign === 'right' ? 'active' : ''}`}
-                          onClick={() => setFormData((c) => ({ ...c, descriptionAlign: 'right' }))}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((c) => ({ ...c, descriptionAlign: 'right' }));
+                            applyFormatting({
+                              editorRef: addTextareaRef,
+                              savedRangeRef: addSavedRangeRef,
+                              action: 'align',
+                              value: 'right',
+                              onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                            });
+                          }}
                           title="Align right"
                         >
                           <AlignRight size={14} />
@@ -2474,7 +2797,17 @@ export default function App() {
                         <button
                           type="button"
                           className={`toolbar-btn ${formData.descriptionAlign === 'justify' ? 'active' : ''}`}
-                          onClick={() => setFormData((c) => ({ ...c, descriptionAlign: 'justify' }))}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((c) => ({ ...c, descriptionAlign: 'justify' }));
+                            applyFormatting({
+                              editorRef: addTextareaRef,
+                              savedRangeRef: addSavedRangeRef,
+                              action: 'align',
+                              value: 'justify',
+                              onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                            });
+                          }}
                           title="Justify text"
                         >
                           <AlignJustify size={14} />
@@ -2486,36 +2819,70 @@ export default function App() {
                       <div className="toolbar-group">
                         <button
                           type="button"
-                          className={`toolbar-btn ${formData.isBold ? 'active' : ''}`}
-                          onClick={() => {
-                            if (addTextareaRef.current?.selectionStart !== addTextareaRef.current?.selectionEnd) {
-                              handleInsertTag(addTextareaRef, '**', '**', false);
-                            } else {
-                              setFormData((c) => ({ ...c, isBold: !c.isBold }));
-                            }
-                          }}
-                          title="Bold"
+                          className="toolbar-btn"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyFormatting({
+                            editorRef: addTextareaRef,
+                            savedRangeRef: addSavedRangeRef,
+                            action: 'bold',
+                            onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                          })}
+                          title="Bold (Selection or current word)"
                         >
                           <Bold size={14} />
                         </button>
                         <button
                           type="button"
-                          className={`toolbar-btn ${formData.isItalic ? 'active' : ''}`}
-                          onClick={() => {
-                            if (addTextareaRef.current?.selectionStart !== addTextareaRef.current?.selectionEnd) {
-                              handleInsertTag(addTextareaRef, '*', '*', false);
-                            } else {
-                              setFormData((c) => ({ ...c, isItalic: !c.isItalic }));
-                            }
-                          }}
-                          title="Italic"
+                          className="toolbar-btn"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyFormatting({
+                            editorRef: addTextareaRef,
+                            savedRangeRef: addSavedRangeRef,
+                            action: 'italic',
+                            onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                          })}
+                          title="Italic (Selection or current word)"
                         >
                           <Italic size={14} />
                         </button>
                         <button
                           type="button"
                           className="toolbar-btn"
-                          onClick={() => handleInsertTag(addTextareaRef, '\n• ', '', false)}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyFormatting({
+                            editorRef: addTextareaRef,
+                            savedRangeRef: addSavedRangeRef,
+                            action: 'underline',
+                            onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                          })}
+                          title="Underline (Selection or current word)"
+                        >
+                          <Underline size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="toolbar-btn"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyFormatting({
+                            editorRef: addTextareaRef,
+                            savedRangeRef: addSavedRangeRef,
+                            action: 'clear',
+                            onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                          })}
+                          title="Clear formatting on selection"
+                        >
+                          <RemoveFormatting size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="toolbar-btn"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyFormatting({
+                            editorRef: addTextareaRef,
+                            savedRangeRef: addSavedRangeRef,
+                            action: 'list',
+                            onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                          })}
                           title="Insert bullet point"
                         >
                           <List size={14} />
@@ -2523,7 +2890,13 @@ export default function App() {
                         <button
                           type="button"
                           className="toolbar-btn"
-                          onClick={() => handleInsertTag(addTextareaRef, '\n> ', '', false)}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyFormatting({
+                            editorRef: addTextareaRef,
+                            savedRangeRef: addSavedRangeRef,
+                            action: 'quote',
+                            onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                          })}
                           title="Insert quote block"
                         >
                           <Quote size={14} />
@@ -2533,26 +2906,39 @@ export default function App() {
                       <div className="toolbar-divider" />
 
                       <div className="toolbar-color-group">
-                        <span className="toolbar-label" title="Text Color">
+                        <span className="toolbar-label" title="Text Color for word or selection">
                           <Type size={13} />
                         </span>
                         {TEXT_COLORS.map((tc) => (
                           <button
                             key={tc.id}
                             type="button"
-                            className={`color-dot-btn ${formData.textColor === tc.color ? 'active' : ''}`}
+                            className="color-dot-btn"
                             style={{ backgroundColor: tc.color || 'var(--text-primary)' }}
-                            onClick={() => setFormData((c) => ({ ...c, textColor: tc.color }))}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => applyFormatting({
+                              editorRef: addTextareaRef,
+                              savedRangeRef: addSavedRangeRef,
+                              action: 'color',
+                              value: tc.color,
+                              onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                            })}
                             title={tc.label}
                             aria-label={tc.label}
                           />
                         ))}
-                        <label className="custom-color-picker-btn" title="Pick custom text color">
+                        <label className="custom-color-picker-btn" title="Pick custom text color for word or selection">
                           <input
                             type="color"
                             className="custom-color-input"
-                            value={formData.textColor?.startsWith('#') ? formData.textColor : '#1f2937'}
-                            onChange={(e) => setFormData((c) => ({ ...c, textColor: e.target.value }))}
+                            value="#1f2937"
+                            onChange={(e) => applyFormatting({
+                              editorRef: addTextareaRef,
+                              savedRangeRef: addSavedRangeRef,
+                              action: 'color',
+                              value: e.target.value,
+                              onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                            })}
                             aria-label="Custom text color"
                           />
                           <Pipette size={11} className="picker-pipette-icon" />
@@ -2562,17 +2948,30 @@ export default function App() {
                       <div className="toolbar-divider" />
 
                       <div className="toolbar-group font-select-group">
-                        <span className="toolbar-label" title="Font Style">
+                        <span className="toolbar-label" title="Font Style for word or selection">
                           <Type size={13} />
                         </span>
                         <select
                           className="font-picker-select"
-                          value={formData.fontFamily || ''}
-                          onChange={(e) => setFormData((c) => ({ ...c, fontFamily: e.target.value }))}
-                          title="Select Font"
+                          defaultValue=""
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val !== undefined && val !== null) {
+                              applyFormatting({
+                                editorRef: addTextareaRef,
+                                savedRangeRef: addSavedRangeRef,
+                                action: 'font',
+                                value: val,
+                                onUpdate: (html) => setFormData((c) => ({ ...c, description: html })),
+                              });
+                              e.target.value = '';
+                            }
+                          }}
+                          title="Select Font for word or selection"
                           aria-label="Font family"
                         >
-                          <option value="">Default Font</option>
+                          <option value="">Font Style...</option>
+                          <option value="">Default Font (ریسیٹ)</option>
                           <optgroup label="── Urdu & Arabic Fonts (خطوط اردو وعربية) ──">
                             {FONT_OPTIONS.filter((f) => f.group === 'Urdu / Arabic').map((f) => (
                               <option key={f.id} value={f.id}>
@@ -2591,20 +2990,17 @@ export default function App() {
                       </div>
                     </div>
 
-                    <textarea
-                      ref={addTextareaRef}
-                      rows="6"
+                    <RichEditor
+                      editorRef={addTextareaRef}
+                      savedRangeRef={addSavedRangeRef}
                       value={formData.description}
-                      onChange={(event) => setFormData((current) => ({ ...current, description: event.target.value }))}
-                      placeholder="Add deeper notes, reflections, or context... (Supports **bold**, *italic*, bullets •)"
+                      onChange={(html) => setFormData((current) => ({ ...current, description: html }))}
+                      placeholder="Add deeper notes, reflections, or context... (Select any word to apply different fonts, colors, and formatting)"
                       dir="auto"
                       style={{
                         textAlign: formData.descriptionAlign || 'right',
-                        color: formData.textColor || undefined,
-                        fontWeight: formData.isBold ? '700' : 'normal',
-                        fontStyle: formData.isItalic ? 'italic' : 'normal',
-                        fontFamily: getFontFamilyCss(formData.fontFamily),
                       }}
+                      onSaveShortcut={() => handleSaveThought()}
                     />
                     <div className="textarea-footer">
                       <span className="counter-text">{getCounts(formData.description)}</span>

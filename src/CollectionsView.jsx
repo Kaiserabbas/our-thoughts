@@ -56,7 +56,15 @@ function highlightMatches(text, query) {
 
 function getSearchExcerpt(text, query, max = 160) {
   if (!text) return 'No description added yet.';
-  const trimmed = text.trim();
+  const trimmed = text
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/p>/gi, ' ')
+    .replace(/<\/div>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!trimmed) return 'No description added yet.';
   if (!query || !query.trim()) {
     return trimmed.length > max ? `${trimmed.slice(0, max)}...` : trimmed;
   }
@@ -152,7 +160,12 @@ export default function CollectionsView({
     e.stopPropagation();
     if (exportingId === thought.id) return;
     setExportingId(thought.id);
-    const fullText = `${thought.subject ? thought.subject + '. ' : ''}${thought.description || ''}`.trim();
+    const cleanDesc = (thought.description || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+    const fullText = `${thought.subject ? thought.subject + '. ' : ''}${cleanDesc}`.trim();
     if (!fullText) { setExportingId(null); return; }
     try {
       const wavBlob = await generateSpiritualVoiceWav(fullText);
@@ -184,8 +197,9 @@ export default function CollectionsView({
 
   // Robust multi-word search with diacritic-tolerant matching across subject, body, category, and author
   const filteredThoughts = [...thoughts].filter((thought) => {
+    const cleanDesc = (thought.description || '').replace(/<[^>]*>/g, ' ');
     const haystack = normalizeUrduText(
-      `${thought.subject || ''} ${thought.description || ''} ${thought.category || ''} ${thought.author || ''}`
+      `${thought.subject || ''} ${cleanDesc} ${thought.category || ''} ${thought.author || ''}`
     );
     const matchesQuery =
       normalizedWords.length === 0 ||
@@ -331,10 +345,10 @@ export default function CollectionsView({
           </div>
         </div>
 
-        {/* Enhanced Heading with generous padding */}
+        {/* Enhanced Heading with generous padding — Default font as requested */}
         <strong
           className="article-title"
-          style={{ fontFamily: getFontFamilyCss(thought.fontFamily) }}
+          style={{ fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" }}
         >
           {highlightMatches(thought.subject || 'Untitled thought', trimmedQuery)}
         </strong>

@@ -48,9 +48,15 @@ export default function PostSoundPlayer({
   const currentBlobUrlRef = useRef(null);
 
   // Thought full text content
+  const cleanDescription = (thought?.description || '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+
   const thoughtText = [
     thought?.subject ? `${thought.subject}.` : '',
-    thought?.description || '',
+    cleanDescription,
   ]
     .filter(Boolean)
     .join(' ')
