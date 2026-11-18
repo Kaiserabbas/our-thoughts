@@ -1628,17 +1628,6 @@ export default function App() {
             <span>افکار</span>
           </span>
 
-          {/* Quick Backup Export (Icon Button) */}
-          <button
-            type="button"
-            className="action-button icon-only-btn backup-top-btn"
-            onClick={handleExportBackup}
-            title="بیک اپ محفوظ کریں (Export JSON Backup)"
-            aria-label="Export Backup"
-          >
-            <Download size={17} />
-          </button>
-
           {/* Quick Session Lock Button (Visible when unlocked) */}
           {isUnlocked && (
             <button
