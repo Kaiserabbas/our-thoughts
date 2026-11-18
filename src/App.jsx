@@ -727,9 +727,20 @@ export default function App() {
 
   const addSubjectFieldRef = useRef(null);
   const addSubjectInputRef = useRef(null);
+  const prevActiveViewRef = useRef(activeView);
 
-  const scrollToSubjectSection = useCallback(() => {
+  const scrollToSubjectSection = useCallback((force = false) => {
     setTimeout(() => {
+      if (!force) {
+        const activeEl = document.activeElement;
+        const isUserTyping =
+          activeEl &&
+          (activeEl.tagName === 'TEXTAREA' ||
+            activeEl.tagName === 'INPUT' ||
+            activeEl.isContentEditable ||
+            Boolean(activeEl.closest?.('[contenteditable="true"]')));
+        if (isUserTyping) return;
+      }
       if (addSubjectFieldRef.current) {
         addSubjectFieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -740,16 +751,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeView === 'add') {
+    if (activeView === 'add' && prevActiveViewRef.current !== 'add') {
       scrollToSubjectSection();
     }
+    prevActiveViewRef.current = activeView;
   }, [activeView, scrollToSubjectSection]);
 
   const requestProtectedView = useCallback((targetView) => {
     if (isUnlocked) {
       handleSwitchView(targetView);
       if (targetView === 'add') {
-        scrollToSubjectSection();
+        scrollToSubjectSection(true);
       }
     } else {
       setPendingTargetView(targetView);
@@ -777,7 +789,7 @@ export default function App() {
       setPendingTargetView(null);
       handleSwitchView(target);
       if (target === 'add') {
-        scrollToSubjectSection();
+        scrollToSubjectSection(true);
       }
       setPasteToast(
         rememberPassword
@@ -824,9 +836,15 @@ export default function App() {
   }, [selectedThought]);
 
   // Route synchronization on hashchange, mount, and thoughts change
+  const currentHashRef = useRef(typeof window !== 'undefined' ? window.location.hash : '');
+
   useEffect(() => {
-    const syncFromHash = () => {
-      const route = parseHashRoute(window.location.hash);
+    const syncFromHash = (isHashChangeEvent = false) => {
+      const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
+      const hashChanged = currentHashRef.current !== currentHash;
+      currentHashRef.current = currentHash;
+
+      const route = parseHashRoute(currentHash);
       if (route.view === 'thought' && route.thoughtId) {
         const found = thoughts.find((t) => String(t.id) === String(route.thoughtId));
         if (found) {
@@ -850,14 +868,18 @@ export default function App() {
           setActiveView(route.view || 'home');
         }
       }
-      if (typeof window !== 'undefined') {
+
+      // Only scroll to top on actual route navigation transitions (hashchange event with a different hash),
+      // never on periodic background syncs or tab focus updates.
+      if (isHashChangeEvent && hashChanged && typeof window !== 'undefined') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
 
-    syncFromHash();
-    window.addEventListener('hashchange', syncFromHash);
-    return () => window.removeEventListener('hashchange', syncFromHash);
+    syncFromHash(false);
+    const handleHashChange = () => syncFromHash(true);
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, [thoughts, isUnlocked]);
 
   // Capacitor Android hardware back button integration
@@ -3321,7 +3343,7 @@ export default function App() {
           className={`mobile-nav-fab ${activeView === 'add' ? 'active' : ''}`}
           onClick={() => {
             if (activeView === 'add') {
-              scrollToSubjectSection();
+              scrollToSubjectSection(true);
             } else {
               requestProtectedView('add');
             }
