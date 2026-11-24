@@ -107,6 +107,116 @@ button {
   cursor: pointer;
 }
 
+.hierarchy-help {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hierarchy-add-row {
+  grid-template-columns: minmax(180px, 0.8fr) minmax(180px, 1fr) auto;
+}
+
+.category-subcategory-list {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.category-subcategory-list span {
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.subcategory-field select,
+.collection-sort-select {
+  min-height: 42px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.bulk-management-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-color) 4%, var(--bg-surface));
+}
+
+/* "✎ Bulk Edit:" label — clearly marks this as a separate action bar */
+.bulk-bar-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.bulk-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.bulk-selected-count {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-color);
+  white-space: nowrap;
+}
+
+/* Category + subcategory inline group in bulk bar */
+.bulk-category-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bulk-management-bar select {
+  min-height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  padding: 0 8px;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 680px) {
+  .hierarchy-add-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-management-bar {
+    align-items: stretch;
+  }
+
+  .bulk-management-bar select,
+  .bulk-management-bar button,
+  .bulk-category-group {
+    width: 100%;
+  }
+}
+
 #root {
   min-height: 100vh;
 }
@@ -473,9 +583,113 @@ h1 {
   gap: 10px 16px;
   color: var(--text-secondary);
   font-size: 0.95rem;
+  align-items: center;
+}
+
+/* Random thought button in heading */
+.collection-random-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 140ms, border-color 140ms, color 140ms;
+}
+.collection-random-btn:hover {
+  background: var(--accent-subtle);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+/* Unclassified filter button */
+.collection-count-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 140ms, border-color 140ms;
+}
+.collection-count-filter-btn:hover,
+.collection-count-filter-btn.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+/* Tag pills on cards */
+.card-tags-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.card-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  background: var(--bg-subtle);
+  color: var(--accent-color);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.card-tag-pill:hover {
+  background: var(--accent-subtle);
+  border-color: var(--accent-color);
+}
+
+/* Reading view: subcategory pill */
+.reading-subcategory-pill {
+  font-size: 0.8rem !important;
+  opacity: 0.8;
+}
+
+/* Reading view: tags list */
+.footer-tags-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.reading-tag-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  background: var(--bg-subtle);
+  color: var(--accent-color);
+  font-size: 11px;
+}
+
+/* Prev / Next navigation in reading footer */
+.reading-prev-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0 4px;
+}
+.reading-page-counter {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  min-width: 60px;
+  text-align: center;
 }
 
 .collection-counts span,
+.collection-counts button,
 .article-meta,
 .article-open {
   display: inline-flex;
@@ -1764,6 +1978,74 @@ h1 {
   font-size: 0.86rem;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+/* Category action buttons group */
+.category-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.category-rename-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 140ms ease;
+}
+
+.category-rename-action-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+/* Inline rename form */
+.category-rename-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.category-rename-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.category-rename-save-btn,
+.category-rename-cancel-btn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: 1px solid;
+  transition: all 120ms ease;
+}
+
+.category-rename-save-btn {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.category-rename-cancel-btn {
+  border-color: var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-muted);
 }
 
 /* ─── Preview Modal ─── */
@@ -8303,6 +8585,64 @@ div[class*="netlify-drawer"] {
   background: var(--accent-color);
 }
 
+/* ─── Subcategory Pill Strip (shown below main category tabs when a category is selected) ─── */
+
+.subcategory-pill-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 4px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+
+.subcategory-strip-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.subcategory-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: all 140ms ease;
+  cursor: pointer;
+}
+
+.subcategory-pill:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.subcategory-pill.active {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #fff;
+  font-weight: 700;
+}
+
+.subcategory-pill-count {
+  font-size: 0.75rem;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+
 [data-theme='dark'] .tab-recent.active {
   color: #0b141f;
 }
@@ -9021,3 +9361,253 @@ div[class*="netlify-drawer"] {
   .collections-heading h2 { font-size: 1.75rem; }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   CATEGORY NAVBAR — two-level nav with dropdown submenus
+   ═══════════════════════════════════════════════════════════════════ */
+
+.cat-navbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex-wrap: wrap;
+  margin: 18px 0 0;
+  padding: 0;
+  border-bottom: 2px solid var(--border-subtle);
+  position: relative;
+}
+
+/* Each nav item is a positioned wrapper so the dropdown can anchor to it */
+.cat-nav-item {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Main category button */
+.cat-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+  white-space: nowrap;
+}
+
+.cat-nav-btn:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+}
+
+.cat-nav-btn.active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 6%, transparent);
+}
+
+.cat-nav-btn.cat-nav-empty {
+  opacity: 0.45;
+}
+
+.cat-nav-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.cat-nav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 100px;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cat-nav-btn.active .cat-nav-count {
+  background: color-mix(in srgb, var(--accent-color) 20%, transparent);
+  color: var(--accent-color);
+}
+
+/* Chevron rotates on hover to signal a dropdown */
+.cat-nav-chevron {
+  opacity: 0.5;
+  transition: transform 180ms ease, opacity 180ms ease;
+  rotate: 90deg; /* point down */
+}
+
+.cat-nav-has-sub:hover .cat-nav-chevron,
+.cat-nav-has-sub:focus-within .cat-nav-chevron {
+  transform: rotate(90deg);
+  opacity: 1;
+}
+
+/* ── Dropdown panel ── */
+.cat-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 230px;
+  z-index: 400;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px color-mix(in srgb, #000 18%, transparent),
+              0 2px 8px  color-mix(in srgb, #000 10%, transparent);
+  padding: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+/* Show dropdown on hover or when focus is inside the nav item */
+.cat-nav-has-sub:hover .cat-nav-dropdown,
+.cat-nav-has-sub:focus-within .cat-nav-dropdown {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.cat-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.cat-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.cat-dropdown-item:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.cat-dropdown-item.active {
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+.cat-dropdown-count {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 20px;
+  text-align: right;
+}
+
+.cat-dropdown-item.active .cat-dropdown-count {
+  color: var(--accent-color);
+}
+
+/* ── Favourites / Recent special-colour overrides ── */
+.cat-nav-btn.tab-favorites.active {
+  color: #c0392b;
+  border-bottom-color: #c0392b;
+  background: color-mix(in srgb, #c0392b 6%, transparent);
+}
+
+.cat-nav-btn.tab-favorites.active .cat-nav-count {
+  background: color-mix(in srgb, #c0392b 18%, transparent);
+  color: #c0392b;
+}
+
+/* ── Toolbar: search + controls on one line ── */
+.toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Collections heading refinement ── */
+.collections-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.collections-heading-left p.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-color);
+  margin: 0 0 4px;
+}
+
+.collections-heading-left h2 {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 700px) {
+  .cat-navbar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0;
+  }
+  .cat-navbar::-webkit-scrollbar { display: none; }
+
+  .cat-nav-dropdown {
+    /* On mobile let the dropdown sit fixed on screen, full-width */
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: auto;
+    min-width: unset;
+    width: calc(100vw - 24px);
+  }
+
+  .toolbar-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
