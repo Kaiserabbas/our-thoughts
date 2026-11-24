@@ -48,6 +48,7 @@ import {
   Palette,
   Pencil,
   Pipette,
+  Pin,
   Plus,
   Quote,
   RemoveFormatting,
@@ -70,6 +71,7 @@ import {
   X,
 } from 'lucide-react';
 import { getFontFamilyCss, getCategoriesByUsage, FONT_OPTIONS } from './fontUtils';
+import { CATEGORY_TAXONOMY, getSubcategoriesForMainCategory } from './categoryTaxonomy';
 
 const DEFAULT_CATEGORIES = Array.isArray(initialData?.categories) && initialData.categories.length
   ? initialData.categories
@@ -110,11 +112,17 @@ function makeBlankForm(categories) {
   try {
     defaultAuthor = localStorage.getItem('thought_organizer_default_author') || 'Qaisar';
   } catch {}
+  const primaryCategory = categories[0] || DEFAULT_CATEGORIES[0];
+  const defaultSubcategory = getSubcategoriesForMainCategory(primaryCategory)[0] || '';
   return {
     subject: '',
     description: '',
     author: defaultAuthor,
-    category: categories[0] || DEFAULT_CATEGORIES[0],
+    category: primaryCategory,
+    subcategory: defaultSubcategory,
+    tags: '',
+    pinned: false,
+    archived: false,
     entryDate: new Date().toISOString().slice(0, 10),
     favorite: false,
     descriptionAlign: 'right',
@@ -132,6 +140,10 @@ function makeEditForm(thought, categories) {
     description: thought?.description || '',
     author: thought?.author || 'Qaisar',
     category: thought?.category || categories[0] || DEFAULT_CATEGORIES[0],
+    subcategory: thought?.subcategory || '',
+    tags: Array.isArray(thought?.tags) ? thought.tags.join(', ') : '',
+    pinned: Boolean(thought?.pinned),
+    archived: Boolean(thought?.archived),
     entryDate: String(thought?.entryDate || new Date().toISOString().slice(0, 10)).slice(0, 10),
     favorite: Boolean(thought?.favorite),
     descriptionAlign: thought?.descriptionAlign || 'right',
@@ -545,11 +557,28 @@ export default function App() {
       const saved = localStorage.getItem('cached_categories');
       const parsed = JSON.parse(saved || 'null');
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return mergeCategories(parsed, defaultCats);
+        const hierarchyNames = CATEGORY_TAXONOMY.map((category) => category.name);
+        const mainCategories = parsed.filter((category) =>
+          hierarchyNames.includes(category) || ![
+            'Poetry', 'Religious', 'Philosophy', 'Books', 'General',
+            'Political', 'Economics',
+          ].includes(category)
+        );
+        return mergeCategories(mainCategories, defaultCats);
       }
       return defaultCats;
     } catch {
       return defaultCats;
+    }
+  });
+
+  const [customSubcategories, setCustomSubcategories] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem('cached_custom_subcategories') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
     }
   });
 
@@ -582,6 +611,7 @@ export default function App() {
   const [collectionSelectedCategory, setCollectionSelectedCategory] = useState('All');
   const [collectionFavoritesOnly, setCollectionFavoritesOnly] = useState(false);
   const [collectionRecentOnly, setCollectionRecentOnly] = useState(false);
+  const [collectionSelectedSubcategory, setCollectionSelectedSubcategory] = useState('All');
   const [activeView, setActiveView] = useState('home');
   const [status, setStatus] = useState(() => {
     if (typeof window !== 'undefined' && CloudVaultService.isConnected()) {
@@ -596,7 +626,7 @@ export default function App() {
   const [copiedThought, setCopiedThought] = useState(false);
   const [pasteToast, setPasteToast] = useState(null);
 
-  // ── Password Protection State (@ThoughtsOrganizer@) ──
+  // ── Password Protection State (OrganizedThoughts) ──
   const [rememberPassword, setRememberPassword] = useState(() => {
     try {
       return localStorage.getItem('thought_organizer_remember_password') === 'true';
@@ -703,12 +733,19 @@ export default function App() {
   }, [ttsStop, navigateTo]);
 
   const handleStartEditThought = useCallback(() => {
+    if (!isUnlocked) {
+      setPendingTargetView('edit');
+      setPasswordInput('');
+      setPasswordError('');
+      setPasswordModalOpen(true);
+      return;
+    }
     if (selectedThought) {
       setEditFormData(makeEditForm(selectedThought, categories));
       setIsEditingThought(true);
       navigateTo(`thought/${selectedThought.id}/edit`);
     }
-  }, [selectedThought, categories, navigateTo]);
+  }, [isUnlocked, selectedThought, categories, navigateTo]);
 
   const handleCancelEditThought = useCallback(() => {
     if (selectedThought) {
@@ -776,7 +813,8 @@ export default function App() {
 
   const handlePasswordSubmit = (e) => {
     if (e) e.preventDefault();
-    if (passwordInput.trim() === '@ThoughtsOrganizer@') {
+    const input = passwordInput.trim();
+    if (input === 'OrganizedThoughts' || input === '@ThoughtsOrganizer@') {
       setIsUnlocked(true);
       try {
         sessionStorage.setItem('thought_organizer_unlocked', 'true');
@@ -790,9 +828,17 @@ export default function App() {
       setPasswordError('');
       const target = pendingTargetView || 'add';
       setPendingTargetView(null);
-      handleSwitchView(target);
-      if (target === 'add') {
-        scrollToSubjectSection(true);
+      if (target === 'edit') {
+        if (selectedThought) {
+          setEditFormData(makeEditForm(selectedThought, categories));
+          setIsEditingThought(true);
+          navigateTo(`thought/${selectedThought.id}/edit`);
+        }
+      } else {
+        handleSwitchView(target);
+        if (target === 'add') {
+          scrollToSubjectSection(true);
+        }
       }
       setPasteToast(
         rememberPassword
@@ -864,7 +910,15 @@ export default function App() {
             }
             return found;
           });
-          setIsEditingThought(route.isEdit);
+          if (route.isEdit && !isUnlocked) {
+            setPendingTargetView('edit');
+            setPasswordInput('');
+            setPasswordError('');
+            setPasswordModalOpen(true);
+            setIsEditingThought(false);
+          } else {
+            setIsEditingThought(route.isEdit);
+          }
         } else {
           setSelectedThought(null);
           setIsEditingThought(false);
@@ -1068,6 +1122,12 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      localStorage.setItem('cached_custom_subcategories', JSON.stringify(customSubcategories));
+    }
+  }, [customSubcategories]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
       localStorage.setItem('cached_deleted_thought_ids', JSON.stringify(deletedThoughtIds));
     }
   }, [deletedThoughtIds]);
@@ -1090,7 +1150,7 @@ export default function App() {
     currentCategories = categories,
     options = {}
   ) => {
-    const { deletedIds = deletedThoughtIds, directPush = false } = options;
+    const { deletedIds = deletedThoughtIds, directPush = false, customSubcategories: providedCustomSubcategories } = options;
 
     if (!CloudVaultService.isConnected()) {
       setStatus('Saved Locally');
@@ -1115,6 +1175,7 @@ export default function App() {
       const remoteVault = await CloudVaultService.downloadSnapshot();
       let finalThoughts = currentThoughts;
       let finalCategories = currentCategories;
+      let finalCustomSubcategories = providedCustomSubcategories || customSubcategories;
       let combinedDeleted = deletedIds;
 
       if (remoteVault) {
@@ -1128,14 +1189,22 @@ export default function App() {
             author: t.author || 'Qaisar',
           }));
           finalCategories = mergeCategories(currentCategories, remoteVault.categories || []);
+          finalCustomSubcategories = [
+            ...customSubcategories,
+            ...(remoteVault.customSubcategories || []),
+          ].filter((item, index, all) =>
+            all.findIndex((other) => other.mainCategory === item.mainCategory) === index
+          );
         }
 
         setThoughts(finalThoughts);
         setCategories(finalCategories);
+        setCustomSubcategories(finalCustomSubcategories);
 
         const result = await CloudVaultService.uploadSnapshot({
           thoughts: finalThoughts,
           categories: finalCategories,
+          customSubcategories: finalCustomSubcategories,
           deletedThoughtIds: combinedDeleted,
           devices: remoteVault.devices || [],
           bannedDeviceIds: remoteVault.bannedDeviceIds || [],
@@ -1163,7 +1232,7 @@ export default function App() {
         performSync(next.currentThoughts, next.currentCategories, next.options);
       }
     }
-  }, [categories, deletedThoughtIds, thoughts]);
+  }, [categories, customSubcategories, deletedThoughtIds, thoughts]);
 
   const syncWithDrive = performSync;
 
@@ -1294,6 +1363,7 @@ export default function App() {
     const data = {
       thoughts,
       categories,
+      customSubcategories,
       deletedThoughtIds,
       exportedAt: new Date().toISOString(),
       app: 'Thought Organizer',
@@ -1317,13 +1387,24 @@ export default function App() {
         const parsed = JSON.parse(e.target.result);
         const importedThoughts = Array.isArray(parsed.thoughts) ? parsed.thoughts : [];
         const importedCategories = normalizeCategories(parsed.categories);
+        const importedCustomSubcategories = Array.isArray(parsed.customSubcategories) ? parsed.customSubcategories : [];
         const mergedT = mergeThoughts(thoughts, importedThoughts, deletedThoughtIds);
         const mergedC = mergeCategories(categories, importedCategories);
+        const mergedCustomMap = new Map();
+        [...customSubcategories, ...importedCustomSubcategories].forEach((item) => {
+          if (!item?.mainCategory) return;
+          mergedCustomMap.set(item.mainCategory, {
+            mainCategory: item.mainCategory,
+            subcategories: [...new Set([...(mergedCustomMap.get(item.mainCategory)?.subcategories || []), ...(item.subcategories || [])])],
+          });
+        });
+        const mergedCustom = [...mergedCustomMap.values()];
         setThoughts(mergedT);
         setCategories(mergedC);
+        setCustomSubcategories(mergedCustom);
         setStatus('Backup Restored');
         if (deviceConnected) {
-          await syncWithDrive(mergedT, mergedC, { directPush: true });
+          await syncWithDrive(mergedT, mergedC, { directPush: true, customSubcategories: mergedCustom });
         }
       } catch {
         alert('Invalid backup JSON file.');
@@ -1366,6 +1447,10 @@ export default function App() {
       description,
       author,
       category: formData.category || categories[0] || DEFAULT_CATEGORIES[0],
+      subcategory: formData.subcategory || '',
+      tags: String(formData.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean),
+      pinned: Boolean(formData.pinned),
+      archived: Boolean(formData.archived),
       entryDate: formData.entryDate || new Date().toISOString().slice(0, 10),
       favorite: Boolean(formData.favorite),
       descriptionAlign: formData.descriptionAlign || 'right',
@@ -1407,6 +1492,32 @@ export default function App() {
     }
   };
 
+  const handleAddSubcategory = async (mainCategory, name) => {
+    const trimmed = String(name || '').trim();
+    if (!mainCategory || !trimmed) return;
+    const nextCustom = customSubcategories.some((item) =>
+      item.mainCategory === mainCategory &&
+      (item.subcategories || []).some((subcategory) => subcategory.toLowerCase() === trimmed.toLowerCase())
+    ) ? customSubcategories : [
+      ...customSubcategories.filter((item) => item.mainCategory !== mainCategory),
+      {
+        mainCategory,
+        subcategories: [
+          ...(
+            getSubcategoriesForMainCategory(mainCategory, customSubcategories)
+          ),
+          trimmed,
+        ],
+      },
+    ];
+    setCustomSubcategories(nextCustom);
+    setStatus('Subcategory added');
+    showPasteToast(`زمرہ "${mainCategory}" میں "${trimmed}" شامل کر دیا گیا`);
+    if (deviceConnected) {
+      await syncWithDrive(thoughts, categories, { directPush: true, customSubcategories: nextCustom });
+    }
+  };
+
   // Request category deletion with confirmation
   const requestDeleteCategory = (categoryName, count) => {
     setConfirmModal({
@@ -1443,6 +1554,26 @@ export default function App() {
     }
   };
 
+  // Rename a main category in-place
+  const handleRenameCategory = async (oldName, newName) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName || categories.includes(trimmed)) return;
+    const nextCategories = categories.map((cat) => (cat === oldName ? trimmed : cat));
+    const updatedThoughts = thoughts.map((thought) =>
+      thought.category === oldName ? { ...thought, category: trimmed, updatedAt: Date.now() } : thought
+    );
+    setCategories(nextCategories);
+    setThoughts(updatedThoughts);
+    if (collectionSelectedCategory === oldName) setCollectionSelectedCategory(trimmed);
+    setFormData((current) => ({ ...current, category: current.category === oldName ? trimmed : current.category }));
+    setEditFormData((current) => ({ ...current, category: current.category === oldName ? trimmed : current.category }));
+    setStatus('Category renamed');
+    showPasteToast(`زمرہ "${oldName}" کا نام "${trimmed}" رکھ دیا گیا`);
+    if (deviceConnected) {
+      await syncWithDrive(updatedThoughts, nextCategories, { directPush: true });
+    }
+  };
+
   // Toggle favorite
   const toggleFavorite = async (id) => {
     const updatedThoughts = thoughts.map((thought) =>
@@ -1459,9 +1590,50 @@ export default function App() {
     }
   };
 
+  const togglePinned = async (id) => {
+    const updatedThoughts = thoughts.map((thought) =>
+      thought.id === id ? { ...thought, pinned: !thought.pinned, updatedAt: Date.now() } : thought
+    );
+    setThoughts(updatedThoughts);
+    setSelectedThought((current) =>
+      current?.id === id ? { ...current, pinned: !current.pinned, updatedAt: Date.now() } : current
+    );
+    if (deviceConnected) await syncWithDrive(updatedThoughts, categories, { directPush: true });
+  };
+
+  const toggleArchived = async (id) => {
+    const updatedThoughts = thoughts.map((thought) =>
+      thought.id === id ? { ...thought, archived: !thought.archived, updatedAt: Date.now() } : thought
+    );
+    setThoughts(updatedThoughts);
+    setSelectedThought((current) =>
+      current?.id === id ? { ...current, archived: !current.archived, updatedAt: Date.now() } : current
+    );
+    if (deviceConnected) await syncWithDrive(updatedThoughts, categories, { directPush: true });
+  };
+
+  const bulkUpdateThoughts = async (ids, patch) => {
+    const idSet = new Set(ids);
+    const updatedThoughts = thoughts.map((thought) =>
+      idSet.has(thought.id)
+        ? { ...thought, ...patch, updatedAt: Date.now() }
+        : thought
+    );
+    setThoughts(updatedThoughts);
+    setStatus('Bulk changes saved');
+    if (deviceConnected) await syncWithDrive(updatedThoughts, categories, { directPush: true });
+  };
+
   // Request thought deletion with confirmation
   const requestDeleteThought = (thought) => {
     if (!thought) return;
+    if (!isUnlocked) {
+      setPendingTargetView(null);
+      setPasswordInput('');
+      setPasswordError('');
+      setPasswordModalOpen(true);
+      return;
+    }
     const thoughtTitle = thought.subject ? `"${thought.subject}"` : 'اس فکر';
     setConfirmModal({
       isOpen: true,
@@ -1516,6 +1688,10 @@ export default function App() {
       description,
       author,
       category: editFormData.category || categories[0] || DEFAULT_CATEGORIES[0],
+      subcategory: editFormData.subcategory || '',
+      tags: String(editFormData.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean),
+      pinned: Boolean(editFormData.pinned),
+      archived: Boolean(editFormData.archived),
       entryDate: editFormData.entryDate || new Date().toISOString().slice(0, 10),
       favorite: Boolean(editFormData.favorite),
       descriptionAlign: editFormData.descriptionAlign || 'right',
@@ -2243,7 +2419,11 @@ export default function App() {
                         role="radio"
                         aria-checked={editFormData.category === category}
                         className={`category-select-chip ${editFormData.category === category ? 'selected' : ''}`}
-                        onClick={() => setEditFormData((current) => ({ ...current, category }))}
+                        onClick={() => setEditFormData((current) => ({
+                          ...current,
+                          category,
+                          subcategory: getSubcategoriesForMainCategory(category, customSubcategories)[0] || '',
+                        }))}
                       >
                         <Tag size={13} />
                         {category}
@@ -2251,6 +2431,26 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                  <div className="field subcategory-field">
+                    <span>Subcategory</span>
+                    <select
+                      value={editFormData.subcategory || ''}
+                      onChange={(event) => setEditFormData((current) => ({ ...current, subcategory: event.target.value }))}
+                    >
+                      {getSubcategoriesForMainCategory(editFormData.category, customSubcategories).map((subcategory) => (
+                        <option key={subcategory} value={subcategory}>{subcategory}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="field">
+                    <span>Tags</span>
+                    <input
+                      value={editFormData.tags || ''}
+                      onChange={(event) => setEditFormData((current) => ({ ...current, tags: event.target.value }))}
+                      placeholder="Comma-separated tags"
+                      dir="auto"
+                    />
+                  </label>
                 </div>
 
                 <div className="field-row">
@@ -2272,6 +2472,22 @@ export default function App() {
                         onChange={(event) => setEditFormData((current) => ({ ...current, favorite: event.target.checked }))}
                       />
                       <Star size={16} className={editFormData.favorite ? 'filled' : ''} /> Add Favorite
+                    </label>
+                    <label className="favorite-toggle compact-fav">
+                      <input
+                        type="checkbox"
+                        checked={editFormData.pinned}
+                        onChange={(event) => setEditFormData((current) => ({ ...current, pinned: event.target.checked }))}
+                      />
+                      <Pin size={16} /> Pin
+                    </label>
+                    <label className="favorite-toggle compact-fav">
+                      <input
+                        type="checkbox"
+                        checked={editFormData.archived}
+                        onChange={(event) => setEditFormData((current) => ({ ...current, archived: event.target.checked }))}
+                      />
+                      Archive
                     </label>
                   </div>
                 </div>
@@ -2300,6 +2516,11 @@ export default function App() {
                       <Tag size={13} />
                       {selectedThought.category || 'متفرق افکار'}
                     </span>
+                    {selectedThought.subcategory && (
+                      <span className="reading-category-pill reading-subcategory-pill">
+                        {selectedThought.subcategory}
+                      </span>
+                    )}
                     {selectedThought.author && (
                       <span className="reading-author-pill" title="قلم کار">
                         <User size={13} />
@@ -2425,6 +2646,11 @@ export default function App() {
                     <span className="footer-tag-item">
                       <strong>موضوع:</strong> {selectedThought.category || 'متفرق'}
                     </span>
+                    {selectedThought.subcategory && (
+                      <span className="footer-tag-item">
+                        <strong>ذیلی:</strong> {selectedThought.subcategory}
+                      </span>
+                    )}
                     {selectedThought.author && (
                       <span className="footer-tag-item">
                         <strong>قلم کار:</strong> {selectedThought.author}
@@ -2440,7 +2666,46 @@ export default function App() {
                         <Star size={13} className="filled" /> پسندیدہ
                       </span>
                     )}
+                    {Array.isArray(selectedThought.tags) && selectedThought.tags.length > 0 && (
+                      <span className="footer-tag-item footer-tags-list">
+                        {selectedThought.tags.map((tag) => (
+                          <span key={tag} className="reading-tag-pill">#{tag}</span>
+                        ))}
+                      </span>
+                    )}
                   </div>
+                  {/* Previous / Next navigation */}
+                  {(() => {
+                    const pool = thoughts.filter((t) => !t.archived);
+                    const idx = pool.findIndex((t) => t.id === selectedThought.id);
+                    const prev = idx > 0 ? pool[idx - 1] : null;
+                    const next = idx < pool.length - 1 ? pool[idx + 1] : null;
+                    return (prev || next) ? (
+                      <div className="reading-prev-next">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={!next}
+                          onClick={() => next && navigateTo(`thought/${next.id}`)}
+                          title="اگلا فکر"
+                        >
+                          <ArrowRight size={15} />
+                          <span>اگلا</span>
+                        </button>
+                        <span className="reading-page-counter">{idx + 1} / {pool.length}</span>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={!prev}
+                          onClick={() => prev && navigateTo(`thought/${prev.id}`)}
+                          title="پچھلا فکر"
+                        >
+                          <span>پچھلا</span>
+                          <ArrowLeft size={15} />
+                        </button>
+                      </div>
+                    ) : null;
+                  })()}
                   <div className="reading-footer-nav">
                     <button
                       type="button"
@@ -2472,6 +2737,7 @@ export default function App() {
           <CollectionsView
             categories={sortedCategories}
             thoughts={thoughts}
+            customSubcategories={customSubcategories}
             collectionSearchQuery={collectionSearchQuery}
             setCollectionSearchQuery={setCollectionSearchQuery}
             collectionSelectedCategory={collectionSelectedCategory}
@@ -2480,10 +2746,15 @@ export default function App() {
             setCollectionFavoritesOnly={setCollectionFavoritesOnly}
             collectionRecentOnly={collectionRecentOnly}
             setCollectionRecentOnly={setCollectionRecentOnly}
+            collectionSelectedSubcategory={collectionSelectedSubcategory}
+            setCollectionSelectedSubcategory={setCollectionSelectedSubcategory}
             formatDate={formatDate}
             summarizeText={summarizeText}
             setSelectedThought={handleSelectThought}
             toggleFavorite={toggleFavorite}
+            togglePinned={togglePinned}
+            toggleArchived={toggleArchived}
+            onBulkUpdate={bulkUpdateThoughts}
             onRequestDeleteThought={requestDeleteThought}
             onAddThought={() => requestProtectedView('add')}
             onCopyThought={handleCopyThought}
@@ -3097,7 +3368,11 @@ export default function App() {
                           role="radio"
                           aria-checked={formData.category === category}
                           className={`category-select-chip ${formData.category === category ? 'selected' : ''}`}
-                          onClick={() => setFormData((current) => ({ ...current, category }))}
+                          onClick={() => setFormData((current) => ({
+                            ...current,
+                            category,
+                            subcategory: getSubcategoriesForMainCategory(category, customSubcategories)[0] || '',
+                          }))}
                         >
                           <Tag size={13} />
                           {category}
@@ -3105,6 +3380,26 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+                    <div className="field subcategory-field">
+                      <span>Subcategory</span>
+                      <select
+                        value={formData.subcategory || ''}
+                        onChange={(event) => setFormData((current) => ({ ...current, subcategory: event.target.value }))}
+                      >
+                        {getSubcategoriesForMainCategory(formData.category, customSubcategories).map((subcategory) => (
+                          <option key={subcategory} value={subcategory}>{subcategory}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <label className="field">
+                      <span>Tags</span>
+                      <input
+                        value={formData.tags || ''}
+                        onChange={(event) => setFormData((current) => ({ ...current, tags: event.target.value }))}
+                        placeholder="Comma-separated tags"
+                        dir="auto"
+                      />
+                    </label>
                   </div>
 
                   <div className="field-row">
@@ -3126,6 +3421,22 @@ export default function App() {
                           onChange={(event) => setFormData((current) => ({ ...current, favorite: event.target.checked }))}
                         />
                         <Star size={16} className={formData.favorite ? 'filled' : ''} /> Add Favorite
+                      </label>
+                      <label className="favorite-toggle compact-fav">
+                        <input
+                          type="checkbox"
+                          checked={formData.pinned}
+                          onChange={(event) => setFormData((current) => ({ ...current, pinned: event.target.checked }))}
+                        />
+                        <Pin size={16} /> Pin
+                      </label>
+                      <label className="favorite-toggle compact-fav">
+                        <input
+                          type="checkbox"
+                          checked={formData.archived}
+                          onChange={(event) => setFormData((current) => ({ ...current, archived: event.target.checked }))}
+                        />
+                        Archive
                       </label>
                     </div>
                   </div>
@@ -3160,11 +3471,29 @@ export default function App() {
                 </div>
                 <div className="stat-row">
                   <div className="stat-icon">
+                    <Pin size={18} />
+                  </div>
+                  <div>
+                    <strong>{thoughts.filter((t) => t.pinned).length}</strong>
+                    <span>Pinned</span>
+                  </div>
+                </div>
+                <div className="stat-row">
+                  <div className="stat-icon">
                     <Tag size={18} />
                   </div>
                   <div>
                     <strong>{categories.length}</strong>
                     <span>Categories</span>
+                  </div>
+                </div>
+                <div className="stat-row">
+                  <div className="stat-icon">
+                    <Layers size={18} />
+                  </div>
+                  <div>
+                    <strong>{CATEGORY_TAXONOMY.reduce((sum, cat) => sum + (cat.subcategories?.length ?? 0), 0)}</strong>
+                    <span>Subcategories</span>
                   </div>
                 </div>
               </div>
@@ -3179,7 +3508,10 @@ export default function App() {
             categories={sortedCategories}
             thoughts={thoughts}
             onAddCategory={handleAddCategory}
+            onAddSubcategory={handleAddSubcategory}
+            customSubcategories={customSubcategories}
             onRequestDeleteCategory={requestDeleteCategory}
+            onRenameCategory={handleRenameCategory}
             status={status}
             isSyncing={isSyncing}
             handleRefreshMemory={handleRefreshMemory}
@@ -3222,7 +3554,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Security Password Modal (@ThoughtsOrganizer@) ── */}
+      {/* ── Security Password Modal (OrganizedThoughts) ── */}
       {passwordModalOpen && (
         <div className="preview-backdrop password-modal-backdrop" role="dialog" aria-modal="true" onClick={handleCancelPassword}>
           <div className="password-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -3232,7 +3564,11 @@ export default function App() {
               </div>
               <h3>محفوظ رسائی (Protected Access)</h3>
               <p>
-                {pendingTargetView === 'settings' ? 'ترتیبات (Settings)' : 'نیا فکر شامل کرنے (Add Thought)'} کے لیے پاس ورڈ درج کریں:
+                {pendingTargetView === 'settings'
+                  ? 'ترتیبات اور زمرہ جات (Settings & Categories)'
+                  : pendingTargetView === 'edit'
+                  ? 'فکر میں ترمیم (Edit Thought)'
+                  : 'نیا فکر شامل کرنے (Add Thought)'} کے لیے پاس ورڈ درج کریں:
               </p>
             </div>
 
