@@ -12,8 +12,8 @@ const DEVICE_ID_KEY = 'thought_organizer_device_id';
 const SALT = new TextEncoder().encode('thought-organizer-vault-salt-v1');
 
 // Hardcoded passwords (user-visible in source, by user request)
-const CONNECT_PASSWORD = 'OurThoughts';
-const ADMIN_PASSWORD = 'DeleteThought';
+const CONNECT_PASSWORD = 'OrganizedThoughts';
+const ADMIN_PASSWORD = 'OrganizedThoughts';
 // Fixed internal sync code — all devices share one vault
 const FIXED_SYNC_CODE = CONNECT_PASSWORD;
 
@@ -127,14 +127,14 @@ export const CloudVaultService = {
     });
 
     if (res.status === 404) {
-      return { isNew: true, thoughts: [], categories: [], deletedThoughtIds: [], devices: [], bannedDeviceIds: [], lastSyncedAt: 0 };
+      return { isNew: true, thoughts: [], categories: [], customSubcategories: [], deletedThoughtIds: [], devices: [], bannedDeviceIds: [], lastSyncedAt: 0 };
     }
 
     if (!res.ok) throw new Error(`Vault request failed (${res.status})`);
 
     const rawData = await res.text();
     if (!rawData || !rawData.trim()) {
-      return { isNew: true, thoughts: [], categories: [], deletedThoughtIds: [], devices: [], bannedDeviceIds: [], lastSyncedAt: 0 };
+      return { isNew: true, thoughts: [], categories: [], customSubcategories: [], deletedThoughtIds: [], devices: [], bannedDeviceIds: [], lastSyncedAt: 0 };
     }
 
     try {
@@ -177,6 +177,7 @@ export const CloudVaultService = {
     const payload = {
       thoughts: snapshot.thoughts || [],
       categories: snapshot.categories || [],
+      customSubcategories: snapshot.customSubcategories || [],
       deletedThoughtIds: snapshot.deletedThoughtIds || [],
       devices,
       bannedDeviceIds,
