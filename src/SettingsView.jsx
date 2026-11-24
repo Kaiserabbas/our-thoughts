@@ -53,6 +53,7 @@ import {
   setAzureEnglishVoice,
   testAzureSpeechConnection,
 } from './azureSpeechService';
+import { getSubcategoriesForMainCategory } from './categoryTaxonomy';
 
 export default function SettingsView({
   theme,
@@ -60,7 +61,10 @@ export default function SettingsView({
   categories,
   thoughts,
   onAddCategory,
+  onAddSubcategory,
+  customSubcategories = [],
   onRequestDeleteCategory,
+  onRenameCategory,
   status,
   isSyncing,
   handleRefreshMemory,
@@ -96,6 +100,10 @@ export default function SettingsView({
   // Categories & Backup
   const [newCatInput, setNewCatInput] = useState('');
   const [catError, setCatError] = useState('');
+  const [newSubcategoryMain, setNewSubcategoryMain] = useState('');
+  const [newSubcategoryName, setNewSubcategoryName] = useState('');
+  const [renamingCat, setRenamingCat] = useState(null); // name of category being renamed
+  const [renameInput, setRenameInput] = useState('');
   const fileInputRef = useRef(null);
 
   // Groq Whisper AI
@@ -1347,7 +1355,7 @@ export default function SettingsView({
                           onChange={(e) => setAdminPasswordInput(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              const ok = adminPasswordInput === 'DeleteThought';
+                              const ok = adminPasswordInput === 'OrganizedThoughts';
                               setAdminVerified(ok);
                               if (!ok) setAdminPasswordInput('');
                             }
@@ -1357,7 +1365,7 @@ export default function SettingsView({
                           type="button"
                           className="glass-btn glass-btn-primary"
                           onClick={() => {
-                            const ok = adminPasswordInput === 'DeleteThought';
+                            const ok = adminPasswordInput === 'OrganizedThoughts';
                             setAdminVerified(ok);
                             if (!ok) setAdminPasswordInput('');
                           }}
@@ -1474,6 +1482,32 @@ export default function SettingsView({
               <button
                 type="button"
                 className="secondary-button"
+                onClick={() => {
+                  const header = ['id', 'subject', 'description', 'category', 'subcategory', 'tags', 'author', 'entryDate', 'favorite', 'pinned', 'archived', 'legacyCategory'];
+                  const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+                  const rows = thoughts.map((t) =>
+                    header.map((k) => {
+                      if (k === 'tags') return escape(Array.isArray(t.tags) ? t.tags.join('; ') : (t.tags || ''));
+                      if (k === 'description') return escape((t.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim());
+                      return escape(t[k]);
+                    }).join(',')
+                  );
+                  const csv = [header.join(','), ...rows].join('\r\n');
+                  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `thoughts-export-${new Date().toISOString().slice(0, 10)}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Download size={16} /> Export CSV
+              </button>
+
+              <button
+                type="button"
+                className="secondary-button"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload size={16} /> Restore from JSON Backup
@@ -1522,6 +1556,40 @@ export default function SettingsView({
               {catError && <p className="field-error-msg">{catError}</p>}
             </form>
 
+            <form
+              className="add-category-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const mainCategory = newSubcategoryMain || categories[0];
+                if (!mainCategory || !newSubcategoryName.trim()) return;
+                onAddSubcategory?.(mainCategory, newSubcategoryName);
+                setNewSubcategoryName('');
+              }}
+            >
+              <div className="input-with-button hierarchy-add-row">
+                <select
+                  value={newSubcategoryMain}
+                  onChange={(event) => setNewSubcategoryMain(event.target.value)}
+                  aria-label="Main category"
+                >
+                  <option value="">Choose main category...</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={newSubcategoryName}
+                  onChange={(event) => setNewSubcategoryName(event.target.value)}
+                  placeholder="New subcategory name..."
+                  dir="auto"
+                />
+                <button type="submit" className="primary-button">
+                  <Plus size={16} /> Add Subcategory
+                </button>
+              </div>
+            </form>
+
             {/* Existing Categories List */}
             <div className="categories-manage-list">
               <h4>Existing Categories ({categories.length})</h4>
@@ -1531,22 +1599,61 @@ export default function SettingsView({
                   const isOnlyOne = categories.length <= 1;
                   return (
                     <div key={cat} className="category-manage-item">
-                      <div className="category-info">
-                        <Tag size={15} />
-                        <strong className="category-name">{cat}</strong>
-                        <span className="category-post-count">
-                          {count} {count === 1 ? 'thought' : 'thoughts'}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="category-delete-action-btn"
-                        onClick={() => onRequestDeleteCategory(cat, count)}
-                        disabled={isOnlyOne}
-                        title={isOnlyOne ? 'At least one category is required' : `Delete category ${cat}`}
-                      >
-                        <Trash2 size={15} /> Delete
-                      </button>
+                      {renamingCat === cat ? (
+                        <form
+                          className="category-rename-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            onRenameCategory?.(cat, renameInput);
+                            setRenamingCat(null);
+                            setRenameInput('');
+                          }}
+                        >
+                          <input
+                            className="category-rename-input"
+                            value={renameInput}
+                            onChange={(e) => setRenameInput(e.target.value)}
+                            autoFocus
+                          />
+                          <button type="submit" className="category-rename-save-btn" title="Save">✓</button>
+                          <button type="button" className="category-rename-cancel-btn" title="Cancel" onClick={() => { setRenamingCat(null); setRenameInput(''); }}>✕</button>
+                        </form>
+                      ) : (
+                        <div className="category-info">
+                          <Tag size={15} />
+                          <strong className="category-name">{cat}</strong>
+                          <span className="category-post-count">
+                            {count} {count === 1 ? 'thought' : 'thoughts'}
+                          </span>
+                          <div className="category-subcategory-list">
+                            {getSubcategoriesForMainCategory(cat, customSubcategories)
+                              .map((subcategory) => (
+                                <span key={subcategory}>{subcategory}</span>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      {renamingCat !== cat && (
+                        <div className="category-action-btns">
+                          <button
+                            type="button"
+                            className="category-rename-action-btn"
+                            onClick={() => { setRenamingCat(cat); setRenameInput(cat); }}
+                            title={`Rename category ${cat}`}
+                          >
+                            ✎ Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="category-delete-action-btn"
+                            onClick={() => onRequestDeleteCategory(cat, count)}
+                            disabled={isOnlyOne}
+                            title={isOnlyOne ? 'At least one category is required' : `Delete category ${cat}`}
+                          >
+                            <Trash2 size={15} /> Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
