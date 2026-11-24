@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getFontFamilyCss } from './fontUtils';
 import { generateSpiritualVoiceWav, triggerDownload } from './audioExporter';
+import { CATEGORY_TAXONOMY, getSubcategoriesForMainCategory } from './categoryTaxonomy';
 import {
   BookOpen,
   CalendarDays,
@@ -12,8 +13,10 @@ import {
   Download,
   Heart,
   Loader2,
+  Pin,
   Plus,
   Search,
+  Shuffle,
   Sparkles,
   Star,
   Tag,
@@ -88,6 +91,7 @@ function getSearchExcerpt(text, query, max = 160) {
 export default function CollectionsView({
   categories,
   thoughts,
+  customSubcategories = [],
   collectionSearchQuery,
   setCollectionSearchQuery,
   collectionSelectedCategory,
@@ -96,10 +100,15 @@ export default function CollectionsView({
   setCollectionFavoritesOnly,
   collectionRecentOnly = false,
   setCollectionRecentOnly,
+  collectionSelectedSubcategory = 'All',
+  setCollectionSelectedSubcategory,
   formatDate,
   summarizeText,
   setSelectedThought,
   toggleFavorite,
+  togglePinned,
+  toggleArchived,
+  onBulkUpdate,
   onRequestDeleteThought,
   onAddThought,
   onCopyThought,
@@ -110,7 +119,6 @@ export default function CollectionsView({
 }) {
   const [copiedId,    setCopiedId]    = useState(null);
   const [exportingId, setExportingId] = useState(null);
-  const categoryTabsRef = useRef(null);
   const searchInputRef = useRef(null);
 
   // Global hotkey: Ctrl+K or / to focus search input instantly
@@ -134,13 +142,6 @@ export default function CollectionsView({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [collectionSearchQuery, setCollectionSearchQuery]);
-
-  const scrollCategoryTabs = (direction) => {
-    if (categoryTabsRef.current) {
-      const scrollOffset = direction === 'left' ? -280 : 280;
-      categoryTabsRef.current.scrollBy({ left: scrollOffset, behavior: 'smooth' });
-    }
-  };
 
   const trimmedQuery = collectionSearchQuery.trim();
   const normalizedWords = normalizeUrduText(trimmedQuery)
@@ -181,6 +182,10 @@ export default function CollectionsView({
 
   // Sort mode for the collection view
   const [sortBy, setSortBy] = useState('newest');
+  const [showArchived, setShowArchived] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkCategory, setBulkCategory] = useState('');
+  const [bulkSubcategory, setBulkSubcategory] = useState('');
 
   const getThoughtTime = (thought) => {
     const raw = thought?.createdAt || thought?.timestamp;
@@ -199,7 +204,7 @@ export default function CollectionsView({
   const filteredThoughts = [...thoughts].filter((thought) => {
     const cleanDesc = (thought.description || '').replace(/<[^>]*>/g, ' ');
     const haystack = normalizeUrduText(
-      `${thought.subject || ''} ${cleanDesc} ${thought.category || ''} ${thought.author || ''}`
+      `${thought.subject || ''} ${cleanDesc} ${thought.category || ''} ${thought.subcategory || ''} ${Array.isArray(thought.tags) ? thought.tags.join(' ') : ''} ${thought.author || ''}`
     );
     const matchesQuery =
       normalizedWords.length === 0 ||
@@ -207,13 +212,21 @@ export default function CollectionsView({
     const matchesFavorite = !collectionFavoritesOnly || thought.favorite;
     const matchesRecent =
       !collectionRecentOnly || nowTs - getThoughtTime(thought) <= RECENT_WINDOW_MS;
-    return matchesQuery && matchesFavorite && matchesRecent;
+    const matchesSubcategory =
+      collectionSelectedSubcategory === 'All' ||
+      thought.subcategory === collectionSelectedSubcategory;
+    const matchesArchive = showArchived ? thought.archived : !thought.archived;
+    return matchesQuery && matchesFavorite && matchesRecent && matchesSubcategory && matchesArchive;
   });
 
-  // Apply category filter
+  // Apply category filter — match on thought.category OR fall back to legacy category name
   const visibleThoughts = (collectionSelectedCategory === 'All'
     ? filteredThoughts
-    : filteredThoughts.filter((thought) => thought.category === collectionSelectedCategory)
+    : filteredThoughts.filter(
+        (thought) =>
+          thought.category === collectionSelectedCategory ||
+          thought.legacyCategory === collectionSelectedCategory
+      )
   ).sort((left, right) => {
     if (sortBy === 'oldest') return getThoughtTime(left) - getThoughtTime(right);
     if (sortBy === 'title')
@@ -243,6 +256,7 @@ export default function CollectionsView({
     .filter((group) => group.items.length > 0);
 
   const totalFavorites = thoughts.filter((thought) => thought.favorite).length;
+  const totalPinned = thoughts.filter((thought) => thought.pinned).length;
 
   const renderThoughtCard = (thought) => {
     const isCustomColor = thought.cardColor && thought.cardColor.startsWith('#');
@@ -266,10 +280,29 @@ export default function CollectionsView({
       >
         <div className="card-top-row">
           <div className="card-top-left-badges">
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(thought.id)}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => {
+                event.stopPropagation();
+                setSelectedIds((current) =>
+                  event.target.checked
+                    ? [...new Set([...current, thought.id])]
+                    : current.filter((id) => id !== thought.id)
+                );
+              }}
+              aria-label={`Select ${thought.subject || 'thought'}`}
+            />
             <span className="card-category-badge">
               <Tag size={12} />
               <span>{thought.category || 'متفرق'}</span>
             </span>
+              {thought.subcategory && (
+                <span className="card-category-badge card-subcategory-badge">
+                  <span>{thought.subcategory}</span>
+                </span>
+              )}
             {thought.author && (
               <span className="card-author-badge" title="مصنف / قلم کار">
                 <User size={11} />
@@ -329,6 +362,36 @@ export default function CollectionsView({
               <Star size={15} className={thought.favorite ? 'filled' : ''} />
             </button>
 
+            {togglePinned && (
+              <button
+                type="button"
+                className={`card-quick-btn pin-btn ${thought.pinned ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePinned(thought.id);
+                }}
+                title={thought.pinned ? 'Unpin thought' : 'Pin thought'}
+                aria-label="Toggle pinned"
+              >
+                <Pin size={15} />
+              </button>
+            )}
+
+            {toggleArchived && (
+              <button
+                type="button"
+                className="card-quick-btn archive-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleArchived(thought.id);
+                }}
+                title={thought.archived ? 'Restore from archive' : 'Archive thought'}
+                aria-label="Toggle archived"
+              >
+                <Download size={15} />
+              </button>
+            )}
+
             {/* Delete */}
             <button
               type="button"
@@ -380,6 +443,21 @@ export default function CollectionsView({
                 {thought.description.trim().split(/\s+/).length} الفاظ
               </span>
             )}
+            {Array.isArray(thought.tags) && thought.tags.length > 0 && (
+              <span className="card-tags-row">
+                {thought.tags.slice(0, 3).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className="card-tag-pill"
+                    onClick={(e) => { e.stopPropagation(); setCollectionSearchQuery(tag); }}
+                    title={`تلاش: ${tag}`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </span>
+            )}
           </div>
 
           <div className="card-bottom-right">
@@ -407,101 +485,192 @@ export default function CollectionsView({
 
   return (
     <section className="collections-page">
+      {/* ══════════════════════════════════════════════
+          PAGE HEADER — title + quick stats
+      ══════════════════════════════════════════════ */}
       <div className="collections-heading">
-        <div>
+        <div className="collections-heading-left">
           <p className="eyebrow">Home</p>
-          <h2>Thought collections</h2>
+          <h2>Thought Collections</h2>
         </div>
         <div className="collection-counts" aria-label="Collection counts">
-          <span>
-            <BookOpen size={15} /> {thoughts.length} thoughts
-          </span>
-          <span>
-            <Tag size={15} /> {categories.length} collections
-          </span>
-          <span>
-            <Heart size={15} /> {totalFavorites} favorites
-          </span>
+          <span><BookOpen size={14} /> {thoughts.length} thoughts</span>
+          <span><Heart size={14} /> {totalFavorites} favourites</span>
+          <span><Pin size={14} /> {totalPinned} pinned</span>
+          <button
+            type="button"
+            className="collection-random-btn"
+            title="فکرِ اتفاقی — Random thought"
+            aria-label="Random thought"
+            onClick={() => {
+              const pool = thoughts.filter((t) => !t.archived);
+              if (!pool.length) return;
+              setSelectedThought(pool[Math.floor(Math.random() * pool.length)]);
+            }}
+          >
+            <Shuffle size={14} />
+            <span>Random</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Category Tabs with Scroll Controls ── */}
-      <div className="category-scroll-container">
-        <button
-          type="button"
-          className="category-scroll-arrow left"
-          onClick={() => scrollCategoryTabs('left')}
-          title="پچھلے موضوعات (Scroll Left)"
-          aria-label="Scroll categories left"
-        >
-          <ChevronLeft size={18} />
-        </button>
-
-        <div className="category-tabs" ref={categoryTabsRef} role="tablist" aria-label="Filter by category">
+      {/* ══════════════════════════════════════════════
+          MAIN CATEGORY NAVBAR — with dropdown submenus
+      ══════════════════════════════════════════════ */}
+      <nav className="cat-navbar" aria-label="Browse by category">
+        {/* ALL tab */}
+        <div className="cat-nav-item">
           <button
             type="button"
-            role="tab"
-            aria-selected={collectionSelectedCategory === 'All' && !collectionFavoritesOnly && !collectionRecentOnly}
-            className={`category-tab ${collectionSelectedCategory === 'All' && !collectionFavoritesOnly && !collectionRecentOnly ? 'active' : ''}`}
-            onClick={() => { setCollectionSelectedCategory('All'); setCollectionFavoritesOnly(false); setCollectionRecentOnly(false); }}
+            className={`cat-nav-btn ${collectionSelectedCategory === 'All' && !collectionFavoritesOnly && !collectionRecentOnly ? 'active' : ''}`}
+            onClick={() => {
+              setCollectionSelectedCategory('All');
+              setCollectionFavoritesOnly(false);
+              setCollectionRecentOnly(false);
+              setCollectionSelectedSubcategory('All');
+            }}
           >
             <BookOpen size={14} />
-            تمام افکار
-            <span className="tab-count">{baseFiltered.length}</span>
+            <span>All</span>
+            <span className="cat-nav-count">{baseFiltered.length}</span>
           </button>
-
-          {categories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              role="tab"
-              aria-selected={collectionSelectedCategory === category && !collectionFavoritesOnly && !collectionRecentOnly}
-              className={`category-tab ${collectionSelectedCategory === category && !collectionFavoritesOnly && !collectionRecentOnly ? 'active' : ''}`}
-              onClick={() => { setCollectionSelectedCategory(category); setCollectionFavoritesOnly(false); setCollectionRecentOnly(false); }}
-            >
-              <Tag size={13} />
-              {category}
-              <span className="tab-count">{categoryCounts[category] || 0}</span>
-            </button>
-          ))}
-
-          <button
-            type="button"
-            role="tab"
-            aria-selected={collectionFavoritesOnly}
-            className={`category-tab tab-favorites ${collectionFavoritesOnly ? 'active' : ''}`}
-            onClick={() => { setCollectionFavoritesOnly(true); setCollectionSelectedCategory('All'); setCollectionRecentOnly(false); }}
-          >
-            <Star size={13} />
-            پسندیدہ
-            <span className="tab-count">{favoritesCount}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={collectionRecentOnly}
-            className={`category-tab tab-recent ${collectionRecentOnly ? 'active' : ''}`}
-            onClick={() => { setCollectionRecentOnly(true); setCollectionFavoritesOnly(false); setCollectionSelectedCategory('All'); }}
-          >
-            <Clock size={13} />
-            Recent
-            <span className="tab-count">{recentCount}</span>
-          </button>
-
         </div>
 
-        <button
-          type="button"
-          className="category-scroll-arrow right"
-          onClick={() => scrollCategoryTabs('right')}
-          title="اگلے موضوعات (Scroll Right)"
-          aria-label="Scroll categories right"
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
+        {/* Main category tabs with dropdown */}
+        {CATEGORY_TAXONOMY.map((taxCat) => {
+          const catName = taxCat.name;
+          const catCount = categoryCounts[catName] || 0;
+          const isActive = collectionSelectedCategory === catName && !collectionFavoritesOnly && !collectionRecentOnly;
+          const subs = getSubcategoriesForMainCategory(catName, customSubcategories);
+          // sub-counts: thoughts in this cat that belong to each subcategory
+          const subCounts = {};
+          for (const s of subs) {
+            subCounts[s] = thoughts.filter((t) => t.category === catName && t.subcategory === s && (!showArchived ? !t.archived : t.archived)).length;
+          }
+          return (
+            <div key={catName} className="cat-nav-item cat-nav-has-sub">
+              <button
+                type="button"
+                className={`cat-nav-btn${isActive ? ' active' : ''}${catCount === 0 ? ' cat-nav-empty' : ''}`}
+                onClick={() => {
+                  setCollectionSelectedCategory(catName);
+                  setCollectionFavoritesOnly(false);
+                  setCollectionRecentOnly(false);
+                  setCollectionSelectedSubcategory('All');
+                }}
+              >
+                <span className="cat-nav-icon">{taxCat.icon}</span>
+                <span>{catName}</span>
+                <span className="cat-nav-count">{catCount}</span>
+                {subs.length > 0 && <ChevronRight size={11} className="cat-nav-chevron" />}
+              </button>
 
-      {/* ── Search Bar & Convenient Word Discovery ── */}
+              {/* Dropdown submenu */}
+              {subs.length > 0 && (
+                <div className="cat-nav-dropdown" role="menu">
+                  <div className="cat-dropdown-header">
+                    <span className="cat-nav-icon">{taxCat.icon}</span>
+                    <strong>{catName}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`cat-dropdown-item${isActive && collectionSelectedSubcategory === 'All' ? ' active' : ''}`}
+                    onClick={() => {
+                      setCollectionSelectedCategory(catName);
+                      setCollectionFavoritesOnly(false);
+                      setCollectionRecentOnly(false);
+                      setCollectionSelectedSubcategory('All');
+                    }}
+                  >
+                    <span>All in {catName}</span>
+                    <span className="cat-dropdown-count">{catCount}</span>
+                  </button>
+                  {subs.map((sub) => (
+                    <button
+                      key={sub}
+                      type="button"
+                      role="menuitem"
+                      className={`cat-dropdown-item${isActive && collectionSelectedSubcategory === sub ? ' active' : ''}`}
+                      onClick={() => {
+                        setCollectionSelectedCategory(catName);
+                        setCollectionFavoritesOnly(false);
+                        setCollectionRecentOnly(false);
+                        setCollectionSelectedSubcategory(sub);
+                      }}
+                    >
+                      <span>{sub}</span>
+                      <span className="cat-dropdown-count">{subCounts[sub] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Favourites */}
+        <div className="cat-nav-item">
+          <button
+            type="button"
+            className={`cat-nav-btn tab-favorites${collectionFavoritesOnly ? ' active' : ''}`}
+            onClick={() => { setCollectionFavoritesOnly(true); setCollectionSelectedCategory('All'); setCollectionRecentOnly(false); setCollectionSelectedSubcategory('All'); }}
+          >
+            <Star size={14} />
+            <span>Favourites</span>
+            <span className="cat-nav-count">{favoritesCount}</span>
+          </button>
+        </div>
+
+        {/* Recent */}
+        <div className="cat-nav-item">
+          <button
+            type="button"
+            className={`cat-nav-btn tab-recent${collectionRecentOnly ? ' active' : ''}`}
+            onClick={() => { setCollectionRecentOnly(true); setCollectionFavoritesOnly(false); setCollectionSelectedCategory('All'); setCollectionSelectedSubcategory('All'); }}
+          >
+            <Clock size={13} />
+            <span>Recent</span>
+            <span className="cat-nav-count">{recentCount}</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ── Active breadcrumb / subcategory pills ── */}
+      {collectionSelectedCategory !== 'All' && !collectionFavoritesOnly && !collectionRecentOnly && (() => {
+        const subs = getSubcategoriesForMainCategory(collectionSelectedCategory, customSubcategories);
+        if (subs.length === 0) return null;
+        return (
+          <div className="subcategory-pill-strip" role="group" aria-label="Filter by subcategory">
+            <span className="subcategory-strip-label"><Tag size={12} /> Subcategory:</span>
+            <button
+              type="button"
+              className={`subcategory-pill ${collectionSelectedSubcategory === 'All' ? 'active' : ''}`}
+              onClick={() => setCollectionSelectedSubcategory('All')}
+            >
+              All <span className="subcategory-pill-count">{visibleThoughts.length}</span>
+            </button>
+            {subs.map((sub) => {
+              const cnt = visibleThoughts.filter((t) => t.subcategory === sub).length;
+              return (
+                <button
+                  key={sub}
+                  type="button"
+                  className={`subcategory-pill ${collectionSelectedSubcategory === sub ? 'active' : ''}`}
+                  onClick={() => setCollectionSelectedSubcategory(collectionSelectedSubcategory === sub ? 'All' : sub)}
+                >
+                  {sub}
+                  {cnt > 0 && <span className="subcategory-pill-count">{cnt}</span>}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ══════════════════════════════════════════════
+          SEARCH + SORT TOOLBAR
+      ══════════════════════════════════════════════ */}
       <div className="collections-toolbar">
         <div className="search-box-row">
           <label className="search-box">
@@ -517,10 +686,7 @@ export default function CollectionsView({
               <button
                 type="button"
                 className="search-clear-btn"
-                onClick={() => {
-                  setCollectionSearchQuery('');
-                  if (searchInputRef.current) searchInputRef.current.focus();
-                }}
+                onClick={() => { setCollectionSearchQuery(''); if (searchInputRef.current) searchInputRef.current.focus(); }}
                 title="تلاش صاف کریں (Clear search)"
                 aria-label="Clear search"
               >
@@ -529,6 +695,27 @@ export default function CollectionsView({
             )}
             <kbd className="search-kbd-hint" title="Press Ctrl+K or / to search">Ctrl K</kbd>
           </label>
+
+          {/* Sort + Archive inline with search */}
+          <div className="toolbar-controls">
+            <select
+              className="collection-sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Sort order"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title">Title A–Z</option>
+            </select>
+            <button
+              type="button"
+              className={`secondary-button archive-filter-btn ${showArchived ? 'active' : ''}`}
+              onClick={() => setShowArchived((v) => !v)}
+            >
+              {showArchived ? 'Show active' : 'Show archive'}
+            </button>
+          </div>
         </div>
 
         {/* Quick Word Discovery Chips */}
@@ -557,22 +744,88 @@ export default function CollectionsView({
             ))}
           </div>
         </div>
-      {/* Sort options */}
-      <div className="collection-sort-row">
-        <label className="collection-sort-label" htmlFor="collection-sort">Sort:</label>
-        <select
-          id="collection-sort"
-          className="collection-sort-select"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-        >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="title">Title A–Z</option>
-        </select>
       </div>
 
-      </div>
+      {onBulkUpdate && (
+        <div className="bulk-management-bar" aria-label="Bulk thought management">
+          <span className="bulk-bar-label">✎ Bulk Edit:</span>
+          <label className="bulk-select-label">
+            <input
+              type="checkbox"
+              checked={visibleThoughts.length > 0 && visibleThoughts.every((thought) => selectedIds.includes(thought.id))}
+              onChange={(event) => setSelectedIds(
+                event.target.checked ? visibleThoughts.map((thought) => thought.id) : []
+              )}
+            />
+            Select visible
+          </label>
+          <span className="bulk-selected-count">{selectedIds.length} selected</span>
+          <div className="bulk-category-group">
+            <select
+              value={bulkCategory}
+              onChange={(event) => {
+                setBulkCategory(event.target.value);
+                setBulkSubcategory('');
+              }}
+              aria-label="Bulk main category"
+            >
+              <option value="">Move to category…</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+            {bulkCategory && (
+              <select
+                value={bulkSubcategory}
+                onChange={(event) => setBulkSubcategory(event.target.value)}
+                aria-label="Bulk subcategory"
+              >
+                <option value="">Subcategory…</option>
+                {getSubcategoriesForMainCategory(bulkCategory, customSubcategories)
+                  .map((subcategory) => (
+                    <option key={subcategory} value={subcategory}>{subcategory}</option>
+                  ))}
+              </select>
+            )}
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!selectedIds.length || (!bulkCategory && !bulkSubcategory)}
+              onClick={() => {
+                const patch = {};
+                if (bulkCategory) patch.category = bulkCategory;
+                if (bulkSubcategory) patch.subcategory = bulkSubcategory;
+                onBulkUpdate(selectedIds, patch);
+                setSelectedIds([]);
+              }}
+            >
+              Apply
+            </button>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!selectedIds.length}
+            onClick={() => {
+              onBulkUpdate(selectedIds, { favorite: true });
+              setSelectedIds([]);
+            }}
+          >
+            ♥ Favorite
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!selectedIds.length}
+            onClick={() => {
+              onBulkUpdate(selectedIds, { archived: true });
+              setSelectedIds([]);
+            }}
+          >
+            Archive
+          </button>
+        </div>
+      )}
 
       {/* ── Content ── */}
       {thoughts.length === 0 ? (
@@ -697,7 +950,7 @@ export default function CollectionsView({
                         setCollectionFavoritesOnly(false);
                       }}
                     >
-                      ...more ({remainingCount} more)
+                      مزید {remainingCount} دیکھیں
                     </button>
                   </div>
                 )}
