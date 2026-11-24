@@ -1,0 +1,22 @@
+{
+  "mode": "dry-run",
+  "source": "C:\\Users\\sale2\\Downloads\\OFFICE\\Qaas\\apps\\our-thoughts\\src\\initialData.json",
+  "counts": {
+    "thoughts": 165,
+    "mapped": 160,
+    "needsReview": 5
+  },
+  "mappings": {
+    "General & Miscellaneous -> متفرق خیالات": 5,
+    "History -> کوفہ کے مسافر": 37,
+    "Literature -> Poetry": 34,
+    "Literature -> اقوال": 6,
+    "Philosophy -> Philosophy": 11,
+    "Religion -> Dua": 8,
+    "Religion -> Religious Poetry": 53,
+    "Religion -> Religious": 6,
+    "Religion -> زیاراتِ معصومینؑ": 2,
+    "Technology & AI -> AI Projects": 1,
+    "Technology & AI -> Prompts": 2
+  }
+}
