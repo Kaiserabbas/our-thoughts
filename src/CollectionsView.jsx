@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { getFontFamilyCss } from './fontUtils';
 import { generateSpiritualVoiceWav, triggerDownload } from './audioExporter';
 import { CATEGORY_TAXONOMY, getSubcategoriesForMainCategory } from './categoryTaxonomy';
@@ -13,6 +13,7 @@ import {
   Download,
   Heart,
   Loader2,
+  MoreHorizontal,
   Pin,
   Plus,
   Search,
@@ -119,7 +120,20 @@ export default function CollectionsView({
 }) {
   const [copiedId,    setCopiedId]    = useState(null);
   const [exportingId, setExportingId] = useState(null);
+  const [openMenuId,  setOpenMenuId]  = useState(null);
   const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const closeMenu = () => setOpenMenuId(null);
+    const onKey = (e) => { if (e.key === 'Escape') setOpenMenuId(null); };
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openMenuId]);
 
   // Global hotkey: Ctrl+K or / to focus search input instantly
   useEffect(() => {
@@ -258,6 +272,65 @@ export default function CollectionsView({
   const totalFavorites = thoughts.filter((thought) => thought.favorite).length;
   const totalPinned = thoughts.filter((thought) => thought.pinned).length;
 
+  // Extract most frequently used meaningful words from thoughts for quick-search chips
+  const suggestedKeywords = useMemo(() => {
+    const STOP_WORDS = new Set([
+      'اور', 'کے', 'کی', 'کا', 'کو', 'سے', 'میں', 'ہے', 'ہیں', 'تھا', 'تھی', 'تھے',
+      'پر', 'نے', 'جو', 'کہ', 'اس', 'ان', 'یہ', 'وہ', 'بھی', 'تو', 'ہی', 'نہیں',
+      'ہو', 'کر', 'کیا', 'ایک', 'لیے', 'لئے', 'گیا', 'گئی', 'گئے', 'جب', 'تب', 'اگر',
+      'مگر', 'لیکن', 'پھر', 'سب', 'اپنے', 'اپنی', 'اپنا', 'کرتے', 'ہوتے', 'ہوتی', 'ہوتا',
+      'والے', 'والی', 'والا', 'رہے', 'رہی', 'رہا', 'ہوئے', 'ہوئی', 'ہوا', 'تک', 'بعد',
+      'پہلے', 'ساتھ', 'طرح', 'بارے', 'یہاں', 'وہاں', 'کچھ', 'کوئی', 'کسی', 'کیوں', 'کیسے',
+      'جہاں', 'وہی', 'اسی', 'ہم', 'تم', 'آپ', 'مجھے', 'ہمیں', 'انہیں', 'انھیں', 'انہوں',
+      'جن', 'جنہیں', 'جس', 'جسے', 'کرنا', 'ہونا', 'دیا', 'دی', 'دے', 'لیا', 'لی', 'لیں',
+      'رکھ', 'بنا', 'جاتا', 'جاتی', 'جاتے', 'سکتا', 'سکتی', 'سکتے', 'چاہیے', 'وغیرہ',
+      'the', 'and', 'for', 'that', 'with', 'this', 'from', 'are', 'was', 'were', 'have',
+      'has', 'had', 'not', 'but', 'you', 'your', 'all', 'can', 'will', 'just', 'into',
+      'more', 'also', 'than', 'then', 'about', 'what', 'when', 'where', 'which', 'who',
+      'why', 'how', 'its', 'their', 'they', 'them', 'been', 'being', 'would', 'could',
+      'should', 'untitled', 'thought', 'nbsp',
+    ]);
+
+    const pool = collectionSelectedCategory !== 'All' && !collectionFavoritesOnly && !collectionRecentOnly
+      ? thoughts.filter((t) => !t.archived && (t.category === collectionSelectedCategory || t.legacyCategory === collectionSelectedCategory))
+      : thoughts.filter((t) => !t.archived);
+    const source = pool.length > 0 ? pool : thoughts;
+
+    const counts = new Map();
+    for (const thought of source) {
+      const cleanDesc = (thought.description || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ');
+      const text = `${thought.subject || ''} ${cleanDesc} ${Array.isArray(thought.tags) ? thought.tags.join(' ') : ''}`;
+      const tokens = text
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .split(/\s+/);
+
+      // Count unique words per thought + frequency so one long post doesn't monopolize chips
+      const seenInThought = new Set();
+      for (const raw of tokens) {
+        const word = raw.trim();
+        const lower = word.toLowerCase();
+        if (word.length < 3 || /^\d+$/.test(word) || STOP_WORDS.has(lower)) continue;
+        if (!seenInThought.has(lower)) {
+          seenInThought.add(lower);
+          const entry = counts.get(lower);
+          counts.set(lower, { display: entry?.display || word, count: (entry?.count || 0) + 1 });
+        }
+      }
+    }
+
+    const top = Array.from(counts.values())
+      .filter((item) => item.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+      .map((item) => item.display);
+
+    return top.length > 0
+      ? top
+      : ['کوفہ', 'شریعتی', 'نہج البلاغہ', 'دعا', 'عشق', 'علم', 'فاطمہؑ', 'حکمت'];
+  }, [thoughts, collectionSelectedCategory, collectionFavoritesOnly, collectionRecentOnly]);
+
   const renderThoughtCard = (thought) => {
     const isCustomColor = thought.cardColor && thought.cardColor.startsWith('#');
     const cardColorClass = isCustomColor ? '' : `card-color-${thought.cardColor || 'default'}`;
@@ -267,7 +340,7 @@ export default function CollectionsView({
     return (
       <div
         key={thought.id}
-        className={`article-card ${cardColorClass}`}
+        className={`article-card ${cardColorClass} ${openMenuId === thought.id ? 'menu-open' : ''}`}
         style={isCustomColor ? { backgroundColor: thought.cardColor } : undefined}
         onClick={() => setSelectedThought(thought)}
         role="button"
@@ -282,6 +355,7 @@ export default function CollectionsView({
           <div className="card-top-left-badges">
             <input
               type="checkbox"
+              className="card-select-checkbox"
               checked={selectedIds.includes(thought.id)}
               onClick={(event) => event.stopPropagation()}
               onChange={(event) => {
@@ -294,24 +368,25 @@ export default function CollectionsView({
               }}
               aria-label={`Select ${thought.subject || 'thought'}`}
             />
-            <span className="card-category-badge">
-              <Tag size={12} />
-              <span>{thought.category || 'متفرق'}</span>
-            </span>
+            <span className="card-category-breadcrumb" title={`${thought.category || 'متفرق'}${thought.subcategory ? ` › ${thought.subcategory}` : ''}`}>
+              <Tag size={11} className="breadcrumb-icon" />
+              <span className="breadcrumb-main">{thought.category || 'متفرق'}</span>
               {thought.subcategory && (
-                <span className="card-category-badge card-subcategory-badge">
-                  <span>{thought.subcategory}</span>
-                </span>
+                <>
+                  <span className="breadcrumb-sep" aria-hidden="true">›</span>
+                  <span className="breadcrumb-sub">{thought.subcategory}</span>
+                </>
               )}
-            {thought.author && (
-              <span className="card-author-badge" title="مصنف / قلم کار">
-                <User size={11} />
-                <span>{highlightMatches(thought.author, trimmedQuery)}</span>
+            </span>
+            {thought.pinned && (
+              <span className="card-pinned-indicator" title="Pinned thought">
+                <Pin size={11} />
               </span>
             )}
           </div>
-          <div className="card-quick-actions">
-            {/* Quick Listen in Spiritual Voice (Gemini TTS) */}
+
+          <div className="card-quick-actions" onClick={(e) => e.stopPropagation()}>
+            {/* Quick Listen (Gemini TTS) */}
             <button
               type="button"
               className={`card-quick-btn listen-btn ${isSpeakingThis ? 'active' : ''} ${isLoadingThis ? 'loading' : ''}`}
@@ -337,17 +412,6 @@ export default function CollectionsView({
               )}
             </button>
 
-            {/* Quick Copy */}
-            <button
-              type="button"
-              className={`card-quick-btn copy-btn ${copiedId === thought.id ? 'active' : ''}`}
-              onClick={(e) => handleQuickCopy(e, thought)}
-              title={copiedId === thought.id ? 'Copied!' : 'Copy post'}
-              aria-label="Copy post"
-            >
-              {copiedId === thought.id ? <Check size={14} className="copied-check" /> : <Copy size={14} />}
-            </button>
-
             {/* Favorite */}
             <button
               type="button"
@@ -359,52 +423,101 @@ export default function CollectionsView({
               title={thought.favorite ? 'Remove from favorites' : 'Add to favorites'}
               aria-label="Toggle favorite"
             >
-              <Star size={15} className={thought.favorite ? 'filled' : ''} />
+              <Star size={14} className={thought.favorite ? 'filled' : ''} />
             </button>
 
-            {togglePinned && (
+            {/* Overflow More Actions Menu */}
+            <div className="card-more-wrapper">
               <button
                 type="button"
-                className={`card-quick-btn pin-btn ${thought.pinned ? 'active' : ''}`}
+                className={`card-quick-btn more-btn ${openMenuId === thought.id ? 'active' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  togglePinned(thought.id);
+                  setOpenMenuId((cur) => (cur === thought.id ? null : thought.id));
                 }}
-                title={thought.pinned ? 'Unpin thought' : 'Pin thought'}
-                aria-label="Toggle pinned"
+                title="More actions"
+                aria-label="More actions"
+                aria-expanded={openMenuId === thought.id}
               >
-                <Pin size={15} />
+                <MoreHorizontal size={15} />
               </button>
-            )}
 
-            {toggleArchived && (
-              <button
-                type="button"
-                className="card-quick-btn archive-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleArchived(thought.id);
-                }}
-                title={thought.archived ? 'Restore from archive' : 'Archive thought'}
-                aria-label="Toggle archived"
-              >
-                <Download size={15} />
-              </button>
-            )}
+              {openMenuId === thought.id && (
+                <div className="card-more-menu" role="menu" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="card-more-item"
+                    onClick={(e) => {
+                      handleQuickCopy(e, thought);
+                      setOpenMenuId(null);
+                    }}
+                  >
+                    {copiedId === thought.id ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{copiedId === thought.id ? 'Copied!' : 'Copy thought'}</span>
+                  </button>
 
-            {/* Delete */}
-            <button
-              type="button"
-              className="card-quick-btn del-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRequestDeleteThought(thought);
-              }}
-              title="Delete thought"
-              aria-label="Delete thought"
-            >
-              <Trash2 size={15} />
-            </button>
+                  {togglePinned && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="card-more-item"
+                      onClick={() => {
+                        togglePinned(thought.id);
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      <Pin size={14} />
+                      <span>{thought.pinned ? 'Unpin' : 'Pin to top'}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="card-more-item"
+                    disabled={exportingId === thought.id}
+                    onClick={(e) => {
+                      handleExportAudio(e, thought);
+                      setOpenMenuId(null);
+                    }}
+                  >
+                    <Download size={14} />
+                    <span>{exportingId === thought.id ? 'Exporting audio…' : 'Export audio (.wav)'}</span>
+                  </button>
+
+                  {toggleArchived && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="card-more-item"
+                      onClick={() => {
+                        toggleArchived(thought.id);
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      <Download size={14} />
+                      <span>{thought.archived ? 'Restore from archive' : 'Archive'}</span>
+                    </button>
+                  )}
+
+                  <div className="card-more-divider" />
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="card-more-item danger"
+                    onClick={() => {
+                      setOpenMenuId(null);
+                      onRequestDeleteThought(thought);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -433,46 +546,45 @@ export default function CollectionsView({
           )}
         </p>
 
+        {Array.isArray(thought.tags) && thought.tags.length > 0 && (
+          <div className="card-tags-row">
+            {thought.tags.slice(0, 3).map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className="card-tag-pill"
+                onClick={(e) => { e.stopPropagation(); setCollectionSearchQuery(tag); }}
+                title={`تلاش: ${tag}`}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="card-bottom-row">
-          <div className="card-bottom-left">
+          <div className="card-bottom-left card-meta-line">
+            {thought.author && (
+              <span className="card-meta-author" title="مصنف / قلم کار">
+                <User size={12} />
+                <span>{highlightMatches(thought.author, trimmedQuery)}</span>
+              </span>
+            )}
+            <span className="card-meta-dot" aria-hidden="true">·</span>
             <span className="article-meta">
               <CalendarDays size={12} /> {formatDate(thought.entryDate || thought.createdAt || thought.timestamp)}
             </span>
             {thought.description && (
-              <span className="article-word-count">
-                {thought.description.trim().split(/\s+/).length} الفاظ
-              </span>
-            )}
-            {Array.isArray(thought.tags) && thought.tags.length > 0 && (
-              <span className="card-tags-row">
-                {thought.tags.slice(0, 3).map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="card-tag-pill"
-                    onClick={(e) => { e.stopPropagation(); setCollectionSearchQuery(tag); }}
-                    title={`تلاش: ${tag}`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
-              </span>
+              <>
+                <span className="card-meta-dot" aria-hidden="true">·</span>
+                <span className="article-word-count">
+                  {thought.description.trim().split(/\s+/).length} الفاظ
+                </span>
+              </>
             )}
           </div>
 
           <div className="card-bottom-right">
-            {/* Export Audio button (Icon button) */}
-            <button
-              type="button"
-              className={`card-export-audio-btn icon-only ${exportingId === thought.id ? 'exporting' : ''}`}
-              onClick={(e) => handleExportAudio(e, thought)}
-              disabled={exportingId === thought.id}
-              title={exportingId === thought.id ? 'آڈیو تیار ہو رہی ہے...' : 'آڈیو محفوظ کریں (.wav)'}
-              aria-label="Export audio"
-            >
-              <Download size={13} />
-            </button>
-
             <span className="article-open-pill" title="مطالعہ فکر (Read thought)">
               <span>مطالعہ</span>
               <ChevronLeft size={13} />
@@ -725,7 +837,7 @@ export default function CollectionsView({
             <span>تجویز کردہ الفاظ:</span>
           </span>
           <div className="search-tag-pills">
-            {['کوفہ', 'شریعتی', 'نہج البلاغہ', 'دعا', 'عشق', 'علم', 'فاطمہؑ', 'حکمت'].map((kw) => (
+            {suggestedKeywords.map((kw) => (
               <button
                 key={kw}
                 type="button"
