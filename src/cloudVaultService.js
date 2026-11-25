@@ -8,6 +8,7 @@
 const VAULT_ENDPOINT = 'https://kvdb.io/EithK3ZJksyD29L2GxV21q';
 const LAST_SYNCED_STORAGE_KEY = 'thought_organizer_last_synced';
 const CONNECTED_KEY = 'thought_organizer_connected';
+const DISCONNECTED_KEY = 'thought_organizer_disconnected';
 const DEVICE_ID_KEY = 'thought_organizer_device_id';
 const SALT = new TextEncoder().encode('thought-organizer-vault-salt-v1');
 
@@ -99,17 +100,19 @@ export const CloudVaultService = {
 
   isConnected() {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem(CONNECTED_KEY) === 'true';
+    return localStorage.getItem(DISCONNECTED_KEY) !== 'true';
   },
 
   connectDevice() {
     if (typeof window === 'undefined') return;
+    localStorage.removeItem(DISCONNECTED_KEY);
     localStorage.setItem(CONNECTED_KEY, 'true');
     getOrCreateDeviceId();
   },
 
   disconnectDevice() {
     if (typeof window === 'undefined') return;
+    localStorage.setItem(DISCONNECTED_KEY, 'true');
     localStorage.removeItem(CONNECTED_KEY);
     localStorage.removeItem(LAST_SYNCED_STORAGE_KEY);
   },
