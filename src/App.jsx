@@ -113,13 +113,12 @@ function makeBlankForm(categories) {
     defaultAuthor = localStorage.getItem('thought_organizer_default_author') || 'Qaisar';
   } catch {}
   const primaryCategory = categories[0] || DEFAULT_CATEGORIES[0];
-  const defaultSubcategory = getSubcategoriesForMainCategory(primaryCategory)[0] || '';
   return {
     subject: '',
     description: '',
     author: defaultAuthor,
     category: primaryCategory,
-    subcategory: defaultSubcategory,
+    subcategory: '',
     tags: '',
     pinned: false,
     archived: false,
@@ -155,9 +154,22 @@ function makeEditForm(thought, categories) {
   };
 }
 
+const MAIN_CATEGORY_NAMES = new Set(CATEGORY_TAXONOMY.map((c) => c.name));
+const NON_MAIN_LEGACY_NAMES = new Set([
+  ...CATEGORY_TAXONOMY.flatMap((c) => c.subcategories || []).filter((s) => !MAIN_CATEGORY_NAMES.has(s)),
+  'Poetry', 'Religious', 'General', 'Political', 'Economics', 'Funny',
+  'کتاب: چھ رکنی شوری، اصول، عوامل اور نتائج',
+]);
+
+function filterMainCategories(list) {
+  const filtered = (Array.isArray(list) ? list : [])
+    .filter(Boolean)
+    .filter((cat) => MAIN_CATEGORY_NAMES.has(cat) || !NON_MAIN_LEGACY_NAMES.has(cat));
+  return filtered.length ? [...new Set(filtered)] : DEFAULT_CATEGORIES;
+}
+
 function normalizeCategories(categories) {
-  const parsed = Array.isArray(categories) ? categories.filter(Boolean) : [];
-  return parsed.length ? parsed : DEFAULT_CATEGORIES;
+  return filterMainCategories(categories);
 }
 
 function formatDate(value) {
@@ -304,8 +316,7 @@ function mergeThoughts(local, remote, deletedIds = []) {
 }
 
 function mergeCategories(local, remote) {
-  const combined = [...new Set([...(remote || []), ...(local || [])].filter(Boolean))];
-  return combined.length ? combined : DEFAULT_CATEGORIES;
+  return filterMainCategories([...(remote || []), ...(local || [])]);
 }
 
 function parseHashRoute(hash) {
@@ -557,14 +568,7 @@ export default function App() {
       const saved = localStorage.getItem('cached_categories');
       const parsed = JSON.parse(saved || 'null');
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const hierarchyNames = CATEGORY_TAXONOMY.map((category) => category.name);
-        const mainCategories = parsed.filter((category) =>
-          hierarchyNames.includes(category) || ![
-            'Poetry', 'Religious', 'Philosophy', 'Books', 'General',
-            'Political', 'Economics',
-          ].includes(category)
-        );
-        return mergeCategories(mainCategories, defaultCats);
+        return mergeCategories(filterMainCategories(parsed), defaultCats);
       }
       return defaultCats;
     } catch {
@@ -1435,6 +1439,10 @@ export default function App() {
       showPasteToast('براہ کرم عنوان یا متن درج کریں (Please enter subject or description)');
       return;
     }
+    if (!formData.subcategory || !formData.subcategory.trim()) {
+      showPasteToast('براہ کرم ذیلی زمرہ منتخب کریں (Please select a subcategory)');
+      return;
+    }
 
     const author = (formData.author ? formData.author.trim() : '') || 'Qaisar';
     try {
@@ -1676,6 +1684,10 @@ export default function App() {
     const subject = editFormData.subject.trim();
     const description = editFormData.description.trim();
     if (!subject && !description) return;
+    if (!editFormData.subcategory || !editFormData.subcategory.trim()) {
+      showPasteToast('براہ کرم ذیلی زمرہ منتخب کریں (Please select a subcategory)');
+      return;
+    }
 
     const author = (editFormData.author ? editFormData.author.trim() : '') || 'Qaisar';
     try {
@@ -2419,11 +2431,14 @@ export default function App() {
                         role="radio"
                         aria-checked={editFormData.category === category}
                         className={`category-select-chip ${editFormData.category === category ? 'selected' : ''}`}
-                        onClick={() => setEditFormData((current) => ({
-                          ...current,
-                          category,
-                          subcategory: getSubcategoriesForMainCategory(category, customSubcategories)[0] || '',
-                        }))}
+                        onClick={() => setEditFormData((current) => {
+                          const nextSubs = getSubcategoriesForMainCategory(category, customSubcategories);
+                          return {
+                            ...current,
+                            category,
+                            subcategory: nextSubs.includes(current.subcategory) ? current.subcategory : '',
+                          };
+                        })}
                       >
                         <Tag size={13} />
                         {category}
@@ -2432,11 +2447,13 @@ export default function App() {
                     ))}
                   </div>
                   <div className="field subcategory-field">
-                    <span>Subcategory</span>
+                    <span>Subcategory *</span>
                     <select
+                      required
                       value={editFormData.subcategory || ''}
                       onChange={(event) => setEditFormData((current) => ({ ...current, subcategory: event.target.value }))}
                     >
+                      <option value="" disabled>-- Select Subcategory (Required) --</option>
                       {getSubcategoriesForMainCategory(editFormData.category, customSubcategories).map((subcategory) => (
                         <option key={subcategory} value={subcategory}>{subcategory}</option>
                       ))}
@@ -3368,11 +3385,14 @@ export default function App() {
                           role="radio"
                           aria-checked={formData.category === category}
                           className={`category-select-chip ${formData.category === category ? 'selected' : ''}`}
-                          onClick={() => setFormData((current) => ({
-                            ...current,
-                            category,
-                            subcategory: getSubcategoriesForMainCategory(category, customSubcategories)[0] || '',
-                          }))}
+                          onClick={() => setFormData((current) => {
+                            const nextSubs = getSubcategoriesForMainCategory(category, customSubcategories);
+                            return {
+                              ...current,
+                              category,
+                              subcategory: nextSubs.includes(current.subcategory) ? current.subcategory : '',
+                            };
+                          })}
                         >
                           <Tag size={13} />
                           {category}
@@ -3381,11 +3401,13 @@ export default function App() {
                       ))}
                     </div>
                     <div className="field subcategory-field">
-                      <span>Subcategory</span>
+                      <span>Subcategory *</span>
                       <select
+                        required
                         value={formData.subcategory || ''}
                         onChange={(event) => setFormData((current) => ({ ...current, subcategory: event.target.value }))}
                       >
+                        <option value="" disabled>-- Select Subcategory (Required) --</option>
                         {getSubcategoriesForMainCategory(formData.category, customSubcategories).map((subcategory) => (
                           <option key={subcategory} value={subcategory}>{subcategory}</option>
                         ))}
