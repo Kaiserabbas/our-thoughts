@@ -801,19 +801,23 @@ export default function App() {
     prevActiveViewRef.current = activeView;
   }, [activeView, scrollToSubjectSection]);
 
+  const requireUnlock = useCallback((pendingAction = 'action') => {
+    if (isUnlocked) return true;
+    setPendingTargetView(pendingAction);
+    setPasswordInput('');
+    setPasswordError('');
+    setPasswordModalOpen(true);
+    return false;
+  }, [isUnlocked]);
+
   const requestProtectedView = useCallback((targetView) => {
-    if (isUnlocked) {
+    if (requireUnlock(targetView)) {
       handleSwitchView(targetView);
       if (targetView === 'add') {
         scrollToSubjectSection(true);
       }
-    } else {
-      setPendingTargetView(targetView);
-      setPasswordInput('');
-      setPasswordError('');
-      setPasswordModalOpen(true);
     }
-  }, [isUnlocked, handleSwitchView, scrollToSubjectSection]);
+  }, [requireUnlock, handleSwitchView, scrollToSubjectSection]);
 
   const handlePasswordSubmit = (e) => {
     if (e) e.preventDefault();
@@ -830,7 +834,7 @@ export default function App() {
       } catch {}
       setPasswordModalOpen(false);
       setPasswordError('');
-      const target = pendingTargetView || 'add';
+      const target = pendingTargetView;
       setPendingTargetView(null);
       if (target === 'edit') {
         if (selectedThought) {
@@ -838,7 +842,7 @@ export default function App() {
           setIsEditingThought(true);
           navigateTo(`thought/${selectedThought.id}/edit`);
         }
-      } else {
+      } else if (target && target !== 'action') {
         handleSwitchView(target);
         if (target === 'add') {
           scrollToSubjectSection(true);
@@ -1187,18 +1191,21 @@ export default function App() {
         combinedDeleted = [...new Set([...deletedIds, ...remoteDeleted])];
         setDeletedThoughtIds(combinedDeleted);
 
-        if (!remoteVault.isNew && !directPush) {
+        if (!remoteVault.isNew) {
+          // Always merge thoughts across devices so concurrent family edits never overwrite each other
           finalThoughts = mergeThoughts(currentThoughts, remoteVault.thoughts || [], combinedDeleted).map((t) => ({
             ...t,
             author: t.author || 'Qaisar',
           }));
-          finalCategories = mergeCategories(currentCategories, remoteVault.categories || []);
-          finalCustomSubcategories = [
-            ...customSubcategories,
-            ...(remoteVault.customSubcategories || []),
-          ].filter((item, index, all) =>
-            all.findIndex((other) => other.mainCategory === item.mainCategory) === index
-          );
+          if (!directPush) {
+            finalCategories = mergeCategories(currentCategories, remoteVault.categories || []);
+            finalCustomSubcategories = [
+              ...customSubcategories,
+              ...(remoteVault.customSubcategories || []),
+            ].filter((item, index, all) =>
+              all.findIndex((other) => other.mainCategory === item.mainCategory) === index
+            );
+          }
         }
 
         setThoughts(finalThoughts);
@@ -1281,7 +1288,7 @@ export default function App() {
   // Connect device with password
   const handleConnectDevice = async (password) => {
     if (!CloudVaultService.verifyConnectPassword(password)) {
-      return { success: false, error: 'Incorrect password. Try "OurThoughts".' };
+      return { success: false, error: 'Incorrect password. Try "OrganizedThoughts".' };
     }
     CloudVaultService.connectDevice();
     setDeviceConnected(true);
@@ -1433,6 +1440,7 @@ export default function App() {
   // Save new thought
   const handleSaveThought = async (event) => {
     if (event) event.preventDefault();
+    if (!requireUnlock('add')) return;
     const subject = formData.subject.trim();
     const description = formData.description.trim();
     if (!subject && !description) {
@@ -1486,6 +1494,7 @@ export default function App() {
 
   // Add category
   const handleAddCategory = async (name) => {
+    if (!requireUnlock()) return;
     const trimmed = name.trim();
     if (!trimmed || categories.includes(trimmed)) return;
 
@@ -1501,6 +1510,7 @@ export default function App() {
   };
 
   const handleAddSubcategory = async (mainCategory, name) => {
+    if (!requireUnlock()) return;
     const trimmed = String(name || '').trim();
     if (!mainCategory || !trimmed) return;
     const nextCustom = customSubcategories.some((item) =>
@@ -1528,6 +1538,7 @@ export default function App() {
 
   // Request category deletion with confirmation
   const requestDeleteCategory = (categoryName, count) => {
+    if (!requireUnlock()) return;
     setConfirmModal({
       isOpen: true,
       title: 'زمرہ حذف کرنے کی تصدیق (Confirm Category Deletion)',
@@ -1564,6 +1575,7 @@ export default function App() {
 
   // Rename a main category in-place
   const handleRenameCategory = async (oldName, newName) => {
+    if (!requireUnlock()) return;
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName || categories.includes(trimmed)) return;
     const nextCategories = categories.map((cat) => (cat === oldName ? trimmed : cat));
@@ -1584,6 +1596,7 @@ export default function App() {
 
   // Toggle favorite
   const toggleFavorite = async (id) => {
+    if (!requireUnlock()) return;
     const updatedThoughts = thoughts.map((thought) =>
       thought.id === id ? { ...thought, favorite: !thought.favorite, updatedAt: Date.now() } : thought
     );
@@ -1599,6 +1612,7 @@ export default function App() {
   };
 
   const togglePinned = async (id) => {
+    if (!requireUnlock()) return;
     const updatedThoughts = thoughts.map((thought) =>
       thought.id === id ? { ...thought, pinned: !thought.pinned, updatedAt: Date.now() } : thought
     );
@@ -1610,6 +1624,7 @@ export default function App() {
   };
 
   const toggleArchived = async (id) => {
+    if (!requireUnlock()) return;
     const updatedThoughts = thoughts.map((thought) =>
       thought.id === id ? { ...thought, archived: !thought.archived, updatedAt: Date.now() } : thought
     );
@@ -1621,6 +1636,7 @@ export default function App() {
   };
 
   const bulkUpdateThoughts = async (ids, patch) => {
+    if (!requireUnlock()) return;
     const idSet = new Set(ids);
     const updatedThoughts = thoughts.map((thought) =>
       idSet.has(thought.id)
@@ -1679,6 +1695,7 @@ export default function App() {
   // Update existing thought
   const handleUpdateThought = async (event) => {
     if (event) event.preventDefault();
+    if (!requireUnlock('edit')) return;
     if (!selectedThought) return;
 
     const subject = editFormData.subject.trim();
@@ -3590,7 +3607,9 @@ export default function App() {
                   ? 'ترتیبات اور زمرہ جات (Settings & Categories)'
                   : pendingTargetView === 'edit'
                   ? 'فکر میں ترمیم (Edit Thought)'
-                  : 'نیا فکر شامل کرنے (Add Thought)'} کے لیے پاس ورڈ درج کریں:
+                  : pendingTargetView === 'add'
+                  ? 'نیا فکر شامل کرنے (Add Thought)'
+                  : 'ترمیم، حذف یا زمرہ تبدیلی (Edit, Delete or Move)'} کے لیے پاس ورڈ درج کریں:
               </p>
             </div>
 
